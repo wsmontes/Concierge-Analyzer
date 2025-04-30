@@ -723,7 +723,10 @@
                 })
                 .then(data => {
                     console.log('Upload response:', data);
-                    storeRecommendationsData(data);
+                    
+                    // Store the data globally for later PDF export
+                    window.lastUploadedData = data;
+                    
                     displayResults(data);
                     
                     // Show export PDF button
@@ -1386,7 +1389,12 @@
             // Store recommendations data when received
             let recommendationsData = [];
             function storeRecommendationsData(data) {
-                recommendationsData = data.recommendations || [];
+                // Store the data globally for later use in PDF export
+                window.lastUploadedData = data;
+                window.recommendationsData = data.recommendations || [];
+                
+                // Log that data was stored successfully
+                console.log('Data stored for PDF export:', data.conversation_count, 'conversations');
             }
             
             // Function to display the conversations list
@@ -1604,6 +1612,18 @@
                 loadingIndicator.classList.remove('d-none');
                 
                 try {
+                    // Safely store data for the PDF export
+                    window.metricsData = [];
+                    window.personaSummary = {};
+                    window.recommendationsData = [];
+                    
+                    // Access data from the global scope if available
+                    if (typeof window.lastUploadedData === 'object' && window.lastUploadedData !== null) {
+                        window.metricsData = window.lastUploadedData.metrics || [];
+                        window.personaSummary = window.lastUploadedData.persona_summary || {};
+                        window.recommendationsData = window.lastUploadedData.recommendations || [];
+                    }
+                    
                     // Get all active chart instances
                     const activeCharts = [
                         responseTimeChart,
@@ -1641,7 +1661,7 @@
                     
                     // Use the ChartExporter utility to create the PDF
                     ChartExporter.createPDFReport(
-                        recommendationsData,
+                        window.recommendationsData,
                         chartConfigs,
                         function(err) {
                             loadingIndicator.classList.add('d-none');
@@ -1739,101 +1759,10 @@
                             </div>
                             <div class="card-body">
                                 <p class="mb-2"><strong>ID:</strong> ${personaId}</p>
-                                <p class="mb-0"><strong>Description:</strong> ${personaDescription}</p>
+                                <p class="mb-2"><strong>Description:</strong> ${personaDescription}</p>
                             </div>
                         `;
                         conversationPersonaDetails.appendChild(personaCard);
-                    }
-                    
-                    // Add recommendation evaluation if available
-                    let recommendationEvaluation = null;
-                    conversation.forEach(msg => {
-                        if (msg.type === 'recommendation' && msg.recommendation_evaluation) {
-                            recommendationEvaluation = msg.recommendation_evaluation;
-                        }
-                    });
-                    
-                    if (recommendationEvaluation) {
-                        // Create recommendation evaluation section
-                        const evalCard = document.createElement('div');
-                        evalCard.className = 'card mb-3';
-                        
-                        // Calculate metrics
-                        const accuracy = (recommendationEvaluation.accuracy * 100).toFixed(0);
-                        const precision = (recommendationEvaluation.precision * 100).toFixed(0);
-                        const recall = (recommendationEvaluation.recall * 100).toFixed(0);
-                        
-                        // Create stats container
-                        let statsHtml = `
-                        <div class="conversation-stats">
-                            <div class="stat-card">
-                                <div class="stat-value">${accuracy}%</div>
-                                <div class="stat-label">ACCURACY</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-value">${precision}%</div>
-                                <div class="stat-label">PRECISION</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-value">${recall}%</div>
-                                <div class="stat-label">RECALL</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-value">${recommendationEvaluation.matched_items.length}</div>
-                                <div class="stat-label">MATCHED</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-value">${recommendationEvaluation.missing_count}</div>
-                                <div class="stat-label">MISSING</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-value">${recommendationEvaluation.extra_count}</div>
-                                <div class="stat-label">EXTRA</div>
-                            </div>
-                        </div>`;
-                        
-                        evalCard.innerHTML = `
-                            <div class="card-header bg-primary bg-opacity-10">
-                                <i class="bi bi-bar-chart me-2"></i>Recommendation Evaluation
-                            </div>
-                            <div class="card-body">
-                                ${statsHtml}
-                            </div>
-                        `;
-                        conversationPersonaDetails.appendChild(evalCard);
-                        
-                        // Show restaurant matches
-                        const matchesContainer = document.getElementById('restaurant-matches');
-                        const matchesContentContainer = document.getElementById('restaurant-matches-container');
-                        matchesContentContainer.innerHTML = '';
-                        
-                        if (recommendationEvaluation.expected_recommendations && 
-                            recommendationEvaluation.actual_recommendations) {
-                            
-                            matchesContainer.classList.remove('d-none');
-                            
-                            // Create a card for each expected restaurant
-                            recommendationEvaluation.expected_recommendations.forEach((restaurant, index) => {
-                                const card = document.createElement('div');
-                                card.className = 'restaurant-match';
-                                
-                                // Check if this restaurant was found in actual recommendations
-                                const found = recommendationEvaluation.actual_recommendations.some(actual => 
-                                    isSameRestaurant(restaurant, actual)
-                                );
-                                
-                                const badgeClass = found ? 'bg-success' : 'bg-danger';
-                                const statusText = found ? 'Found' : 'Missing';
-                                
-                                card.innerHTML = `
-                                    <div class="restaurant-match-header">
-                                        <div>Expected #${index + 1}: ${restaurant}</div>
-                                        <div><span class="badge ${badgeClass}">${statusText}</span></div>
-                                    </div>
-                                `;
-                                matchesContentContainer.appendChild(card);
-                            });
-                        }
                     }
                 } else {
                     personaBadge.classList.add('d-none');
@@ -1940,7 +1869,6 @@
                         text += `Accuracy: ${(eval.accuracy * 100).toFixed(0)}%\n`;
                         text += `Precision: ${(eval.precision * 100).toFixed(0)}%\n`;
                         text += `Recall: ${(eval.recall * 100).toFixed(0)}%\n`;
-                        
                         text += `\nEXPECTED RESTAURANTS:\n`;
                         eval.expected_recommendations.forEach((r, i) => {
                             text += `${i+1}. ${r}\n`;

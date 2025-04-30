@@ -686,6 +686,18 @@ def upload_chat():
         conversations = parser.parse_whatsapp_chat(chat_text)
         logger.info(f"Parsed {len(conversations)} conversations")
         
+        # Create a summary of conversations for PDF export
+        conversation_summaries = []
+        for i, conversation in enumerate(conversations):
+            # Only include key information for the PDF summary
+            summary = {
+                'id': i,
+                'request': next((msg['content'] for msg in conversation if msg['type'] == 'user_request'), 'No request'),
+                'recommendation': next((msg['content'] for msg in conversation if msg['type'] == 'recommendation'), 'No recommendation'),
+                'timestamp': next((msg['timestamp'].isoformat() for msg in conversation if msg['type'] == 'user_request'), None),
+            }
+            conversation_summaries.append(summary)
+        
         metrics = parser.get_conversation_metrics()
         logger.info(f"Generated metrics for {len(metrics)} conversations")
         
@@ -704,7 +716,8 @@ def upload_chat():
             'metrics': metrics,
             'recommendations': recommendations,
             'network': network_data,
-            'persona_summary': persona_summary
+            'persona_summary': persona_summary,
+            'conversation_summaries': conversation_summaries  # Include summaries in the response
         }
         
         # Verify the response can be serialized to JSON
