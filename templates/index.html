@@ -759,22 +759,44 @@
                 let minRecommendationTime = Infinity;
                 let maxRecommendationTime = 0;
                 
+                // Define reasonable maximum time limit (5 minutes in seconds)
+                // This prevents extreme outliers from distorting the analysis
+                const MAX_REASONABLE_TIME = 300; 
+                
+                // Array to store filtered response times for chart display
+                const filteredMetrics = data.metrics.filter(metric => {
+                    // Only include metrics with reasonable response times
+                    const validRecommendationTime = metric.time_to_recommendation && 
+                                                  metric.time_to_recommendation <= MAX_REASONABLE_TIME;
+                                                  
+                    const validFirstResponseTime = metric.time_to_first_response && 
+                                                 metric.time_to_first_response <= MAX_REASONABLE_TIME;
+                                                 
+                    return validRecommendationTime || validFirstResponseTime;
+                });
+                
                 // Process response time metrics
                 data.metrics.forEach(metric => {
                     if (metric.time_to_recommendation) {
-                        avgRecommendationTime += metric.time_to_recommendation;
-                        recommendationTimeCount++;
-                        
-                        minRecommendationTime = Math.min(minRecommendationTime, metric.time_to_recommendation);
-                        maxRecommendationTime = Math.max(maxRecommendationTime, metric.time_to_recommendation);
+                        // Only include reasonable values in averages
+                        if (metric.time_to_recommendation <= MAX_REASONABLE_TIME) {
+                            avgRecommendationTime += metric.time_to_recommendation;
+                            recommendationTimeCount++;
+                            
+                            minRecommendationTime = Math.min(minRecommendationTime, metric.time_to_recommendation);
+                            maxRecommendationTime = Math.max(maxRecommendationTime, metric.time_to_recommendation);
+                        }
                     }
                     
                     if (metric.time_to_first_response) {
-                        avgFirstResponseTime += metric.time_to_first_response;
-                        firstResponseTimeCount++;
-                        
-                        minFirstResponse = Math.min(minFirstResponse, metric.time_to_first_response);
-                        maxFirstResponse = Math.max(maxFirstResponse, metric.time_to_first_response);
+                        // Only include reasonable values in averages
+                        if (metric.time_to_first_response <= MAX_REASONABLE_TIME) {
+                            avgFirstResponseTime += metric.time_to_first_response;
+                            firstResponseTimeCount++;
+                            
+                            minFirstResponse = Math.min(minFirstResponse, metric.time_to_first_response);
+                            maxFirstResponse = Math.max(maxFirstResponse, metric.time_to_first_response);
+                        }
                     }
                 });
                 
@@ -800,9 +822,9 @@
                     document.getElementById('max-recommendation-time').textContent = `Max: ${maxRecommendationTime.toFixed(1)}s`;
                 }
                 
-                // Display response time chart - Add logging to debug data
-                console.log("Response time metrics:", data.metrics);
-                displayResponseTimeChart(data.metrics);
+                // Display response time chart using filtered metrics
+                console.log("Response time metrics (filtered):", filteredMetrics);
+                displayResponseTimeChart(filteredMetrics);
                 
                 // Update persona stats
                 if (data.persona_summary) {
@@ -892,7 +914,12 @@
                                 title: {
                                     display: true,
                                     text: 'Time (seconds)'
-                                }
+                                },
+                                // Add suggested max to prevent extreme values from making the chart unreadable
+                                suggestedMax: Math.min(
+                                    Math.max(...firstResponseTimes, ...recommendationTimes) * 1.1, 
+                                    60 // Cap at 60 seconds for better readability
+                                )
                             },
                             x: {
                                 title: {
