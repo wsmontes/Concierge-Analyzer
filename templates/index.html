@@ -1,0 +1,1993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Concierge Chat Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Add jsPDF libraries for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Add chart exporter utility -->
+    <script src="/static/js/chart-exporter.js"></script>
+    <style>
+        body {
+            padding: 10px;
+            background-color: #f8f9fa;
+            color: #212529;
+            font-size: 14px;
+        }
+        .header-container {
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            margin-bottom: 15px;
+        }
+        .card {
+            margin-bottom: 15px;
+            border: none;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            border-radius: 10px;
+        }
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid rgba(0,0,0,.125);
+            font-weight: 600;
+            padding: 0.75rem 1rem;
+        }
+        .card-body {
+            padding: 0.75rem 1rem;
+        }
+        .summary-card {
+            text-align: center;
+            padding: 10px;
+            transition: transform .2s;
+        }
+        .summary-card:hover {
+            transform: translateY(-3px);
+        }
+        .summary-icon {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+            color: #0d6efd;
+        }
+        .summary-title {
+            color: #6c757d;
+            font-size: 0.8rem;
+            margin-bottom: 3px;
+        }
+        .summary-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #212529;
+        }
+        .conversation-container {
+            max-height: 450px;
+            overflow-y: auto;
+            background-color: #fff;
+            border-radius: 10px;
+        }
+        .conversation-list-item {
+            border-left: 5px solid transparent;
+            transition: all 0.2s;
+            padding: 0.5rem 0.75rem;
+        }
+        .conversation-list-item:hover {
+            background-color: #f8f9fa;
+            border-left-color: #0d6efd;
+        }
+        .conversation-list-item.active {
+            background-color: #e9ecef;
+            border-left-color: #0d6efd;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            position: relative;
+            font-size: 0.9rem;
+        }
+        .message.user {
+            background-color: #e9ecef;
+            margin-left: 15%;
+            border-top-right-radius: 0;
+        }
+        .message.concierge {
+            background-color: #d1e7dd;
+            margin-right: 15%;
+            border-top-left-radius: 0;
+        }
+        .message.debug {
+            background-color: #f8d7da;
+            font-family: monospace;
+            font-size: 0.75em;
+            white-space: pre-wrap;
+        }
+        .message-sender {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 0.85rem;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        .accuracy-badge {
+            font-size: 0.8em;
+            padding: 4px 8px;
+            margin-left: 8px;
+        }
+        .chart-container {
+            position: relative;
+            height: 200px;
+            width: 100%;
+        }
+        .navbar-brand {
+            font-weight: 700;
+            color: #0d6efd;
+        }
+        .tab-content {
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .nav-tabs {
+            border-bottom: none;
+        }
+        .nav-tabs .nav-link {
+            margin-right: 3px;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+            font-weight: 600;
+            color: #6c757d;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.9rem;
+        }
+        .nav-tabs .nav-link.active {
+            border-color: #dee2e6 #dee2e6 #fff;
+            background-color: #fff;
+            color: #0d6efd;
+        }
+        .time-metric-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+        .time-metric-title {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-bottom: 3px;
+        }
+        .time-metric-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        .export-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        .export-button i {
+            font-size: 1.5rem;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+            .summary-value {
+                font-size: 1.2rem;
+            }
+            .chart-container {
+                height: 180px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .summary-card {
+                margin-bottom: 10px;
+            }
+            .chart-container {
+                height: 160px;
+            }
+        }
+        
+        /* Print-specific styles for PDF export */
+        .print-section {
+            page-break-inside: avoid;
+        }
+
+        /* Additional styles for improved conversation display */
+        .conversation-filter-container {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .message-timestamp {
+            font-size: 0.7rem;
+            color: #6c757d;
+            margin-bottom: 3px;
+        }
+        .conversation-header {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .conversation-metrics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .metric-pill {
+            background-color: #e9ecef;
+            border-radius: 16px;
+            padding: 4px 10px;
+            font-size: 0.8rem;
+            color: #495057;
+            display: flex;
+            align-items: center;
+        }
+        .metric-pill i {
+            margin-right: 5px;
+        }
+        .conversation-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .stat-card {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #0d6efd;
+        }
+        .stat-label {
+            font-size: 0.7rem;
+            color: #6c757d;
+        }
+        .sticky-list {
+            position: sticky;
+            top: 0;
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+        .restaurant-match {
+            margin-bottom: 10px;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            padding: 8px;
+        }
+        .restaurant-match-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .conversation-filter-row {
+            margin-bottom: 10px;
+        }
+        /* Hide debug messages when the toggle is off */
+        .hide-debug .message.debug {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="header-container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-2"><i class="bi bi-chat-dots me-2"></i>Concierge Chat Analyzer</h1>
+                    <p class="text-muted mb-0">Upload a WhatsApp chat export to analyze Concierge AI performance</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button id="export-pdf" class="btn btn-outline-primary d-none">
+                        <i class="bi bi-file-earmark-pdf me-2"></i>Export Report (PDF)
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Upload Form -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-upload me-2"></i>Upload Chat File
+            </div>
+            <div class="card-body">
+                <form id="upload-form">
+                    <div class="mb-3">
+                        <label for="chat-file" class="form-label">Select WhatsApp chat export file</label>
+                        <input class="form-control" type="file" id="chat-file" name="chat_file">
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search me-2"></i>Analyze
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Loading Indicator -->
+        <div id="loading" class="text-center my-5 d-none">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Analyzing chat data...</p>
+        </div>
+        
+        <!-- Results Container -->
+        <div id="results-container" class="d-none">
+            <!-- Export PDF floating button for mobile -->
+            <button id="export-pdf-mobile" class="btn btn-primary export-button d-md-none">
+                <i class="bi bi-file-earmark-pdf"></i>
+            </button>
+            
+            <!-- Summary Stats -->
+            <div class="card mb-4 print-section" id="summary-section">
+                <div class="card-header">
+                    <i class="bi bi-bar-chart-fill me-2"></i>Summary
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 col-sm-6">
+                            <div class="summary-card">
+                                <div class="summary-icon">
+                                    <i class="bi bi-chat-square-text"></i>
+                                </div>
+                                <div class="summary-title">TOTAL CONVERSATIONS</div>
+                                <div class="summary-value" id="conversation-count">0</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="summary-card">
+                                <div class="summary-icon">
+                                    <i class="bi bi-clock"></i>
+                                </div>
+                                <div class="summary-title">AVG. TIME TO RECOMMENDATION</div>
+                                <div class="summary-value" id="avg-recommendation-time">0s</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="summary-card">
+                                <div class="summary-icon">
+                                    <i class="bi bi-lightning-charge"></i>
+                                </div>
+                                <div class="summary-title">AVG. FIRST RESPONSE</div>
+                                <div class="summary-value" id="avg-first-response">0s</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="summary-card">
+                                <div class="summary-icon">
+                                    <i class="bi bi-person-check"></i>
+                                </div>
+                                <div class="summary-title">MATCHED PERSONAS</div>
+                                <div class="summary-value" id="matched-personas">0/0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Response Time Analysis -->
+            <div class="card mb-4 print-section" id="response-time-section">
+                <div class="card-header">
+                    <i class="bi bi-stopwatch me-2"></i>Response Time Analysis
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <div class="chart-container">
+                                <canvas id="response-time-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="row">
+                                <div class="col-md-6 col-lg-12">
+                                    <div class="time-metric-card">
+                                        <div class="time-metric-title">TIME TO FIRST RESPONSE</div>
+                                        <div class="time-metric-value" id="min-first-response">Min: 0s</div>
+                                        <div class="time-metric-value" id="max-first-response">Max: 0s</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-lg-12">
+                                    <div class="time-metric-card">
+                                        <div class="time-metric-title">TIME TO RECOMMENDATION</div>
+                                        <div class="time-metric-value" id="min-recommendation-time">Min: 0s</div>
+                                        <div class="time-metric-value" id="max-recommendation-time">Max: 0s</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Analysis Tabs -->
+            <ul class="nav nav-tabs mb-0" id="analysisTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="personas-tab" data-bs-toggle="tab" data-bs-target="#personas" 
+                            type="button" role="tab" aria-controls="personas" aria-selected="true">
+                        <i class="bi bi-people me-2"></i>Persona Analysis
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="recommendations-tab" data-bs-toggle="tab" data-bs-target="#recommendations" 
+                            type="button" role="tab" aria-controls="recommendations" aria-selected="false">
+                        <i class="bi bi-bar-chart-fill me-2"></i>Recommendations Analysis
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="conversations-tab" data-bs-toggle="tab" data-bs-target="#conversations" 
+                            type="button" role="tab" aria-controls="conversations" aria-selected="false">
+                        <i class="bi bi-chat me-2"></i>Conversations
+                    </button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="analysisTabContent">
+                <!-- Persona Analysis Tab -->
+                <div class="tab-pane fade show active print-section" id="personas" role="tabpanel" aria-labelledby="personas-tab">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">Recommendation Accuracy</div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="accuracy-chart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">Accuracy Distribution</div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="accuracy-distribution-chart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recommendations Analysis Tab -->
+                <div class="tab-pane fade print-section" id="recommendations" role="tabpanel" aria-labelledby="recommendations-tab">
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">Recommendation Statistics</div>
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="me-3"><strong>Avg. Precision:</strong></div>
+                                        <div class="progress flex-grow-1" style="height: 20px">
+                                            <div id="avg-precision-bar" class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="me-3"><strong>Avg. Recall:</strong></div>
+                                        <div class="progress flex-grow-1" style="height: 20px">
+                                            <div id="avg-recall-bar" class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="me-3"><strong>Avg. Accuracy:</strong></div>
+                                        <div class="progress flex-grow-1" style="height: 20px">
+                                            <div id="avg-accuracy-bar" class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header">Recommendation Counts</div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="recommendation-count-chart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header">Metrics Distribution</div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="metrics-distribution-chart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">Detailed Recommendations Comparison</div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover table-bordered table-sm" id="recommendations-comparison-table" style="width: 100%;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 5%;">#</th>
+                                            <th style="width: 8%;">Persona</th>
+                                            <th style="width: 17%;">Request</th>
+                                            <th style="width: 30%;">Expected</th>
+                                            <th style="width: 30%;">Actual</th>
+                                            <th style="width: 10%;">Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Rows will be inserted here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Conversations Tab -->
+                <div class="tab-pane fade" id="conversations" role="tabpanel" aria-labelledby="conversations-tab">
+                    <div class="conversation-filter-container mb-3">
+                        <div class="row conversation-filter-row">
+                            <div class="col-md-4">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                    <input type="text" id="conversation-search" class="form-control" placeholder="Search requests...">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <select id="persona-filter" class="form-select">
+                                    <option value="">All Personas</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select id="accuracy-filter" class="form-select">
+                                    <option value="">All Accuracy</option>
+                                    <option value="high">High (≥75%)</option>
+                                    <option value="medium">Medium (50-74%)</option>
+                                    <option value="low">Low (<50%)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button id="reset-filters" class="btn btn-outline-secondary w-100">Reset</button>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <span class="badge bg-primary me-1" id="conversations-count">0</span> conversation(s) found
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-lg-4">
+                            <div class="card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <div><i class="bi bi-list-ul me-2"></i>Conversations List</div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="time-sort-toggle">
+                                        <label class="form-check-label" for="time-sort-toggle">Sort by Time</label>
+                                    </div>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="list-group list-group-flush conversations-list sticky-list" id="conversations-list">
+                                        <!-- Conversations will be added here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-8">
+                            <!-- Selected Conversation -->
+                            <div class="card h-100 d-none" id="conversation-details">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span id="conversation-title">Conversation Details</span>
+                                        <span id="persona-badge" class="badge bg-info ms-2"></span>
+                                    </div>
+                                    <div>
+                                        <div class="form-check form-switch d-inline-block me-3">
+                                            <input class="form-check-input" type="checkbox" id="debug-toggle">
+                                            <label class="form-check-label" for="debug-toggle">Show Debug Messages</label>
+                                        </div>
+                                        <button id="export-conversation" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-download me-1"></i>Export
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="conversation-header">
+                                        <div class="conversation-metrics mb-3">
+                                            <div class="metric-pill"><i class="bi bi-clock"></i> <span id="conv-time-to-first">-</span></div>
+                                            <div class="metric-pill"><i class="bi bi-hourglass"></i> <span id="conv-time-to-rec">-</span></div>
+                                            <div class="metric-pill"><i class="bi bi-calendar3"></i> <span id="conv-date">-</span></div>
+                                            <div class="metric-pill"><i class="bi bi-chat-dots"></i> <span id="conv-message-count">-</span></div>
+                                        </div>
+
+                                        <div id="conversation-persona-details">
+                                            <!-- Persona details will be shown here -->
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="restaurant-matches" class="mb-3 d-none">
+                                        <h6>Restaurant Matches Analysis</h6>
+                                        <div id="restaurant-matches-container">
+                                            <!-- Restaurant matches will be shown here -->
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="conversation-container" class="conversation-container">
+                                        <!-- Messages will be added here -->
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Placeholder when no conversation is selected -->
+                            <div class="card h-100" id="no-conversation-placeholder">
+                                <div class="card-body d-flex flex-column align-items-center justify-content-center text-center text-muted">
+                                    <i class="bi bi-chat-square-text mb-3" style="font-size: 3rem;"></i>
+                                    <h5>Select a conversation from the list</h5>
+                                    <p>Conversation details will appear here</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadForm = document.getElementById('upload-form');
+            const loadingIndicator = document.getElementById('loading');
+            const resultsContainer = document.getElementById('results-container');
+            const conversationsList = document.getElementById('conversations-list');
+            const conversationDetails = document.getElementById('conversation-details');
+            const conversationContainer = document.getElementById('conversation-container');
+            const conversationTitle = document.getElementById('conversation-title');
+            const conversationPersonaDetails = document.getElementById('conversation-persona-details');
+            const personaBadge = document.getElementById('persona-badge');
+            const exportPdfBtn = document.getElementById('export-pdf');
+            const exportPdfMobileBtn = document.getElementById('export-pdf-mobile');
+            const debugToggle = document.getElementById('debug-toggle');
+
+            let accuracyChart = null;
+            let accuracyDistChart = null;
+            let recommendationCountChart = null;
+            let metricsDistributionChart = null;
+            let responseTimeChart = null;
+            
+            // Get the Flask server URL - adjust this to your server's address and port
+            const FLASK_SERVER_URL = 'http://localhost:5000';
+            
+            uploadForm.addEventListener('submit', function(event) {
+                event.preventDefault();
+                
+                const formData = new FormData(uploadForm);
+                const chatFile = document.getElementById('chat-file').files[0];
+                
+                if (!chatFile) {
+                    alert('Please select a file to upload');
+                    return;
+                }
+                
+                // Show loading indicator
+                loadingIndicator.classList.remove('d-none');
+                resultsContainer.classList.add('d-none');
+                
+                // Upload file - using the full URL with the Flask server address
+                fetch(`${FLASK_SERVER_URL}/upload`, {
+                    method: 'POST',
+                    body: formData,
+                })
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    
+                    if (!response.ok) {
+                        if (response.status === 405) {
+                            throw new Error('Method not allowed. The server doesn\'t accept POST requests at this endpoint.');
+                        } else {
+                            return response.json().then(errorData => {
+                                throw new Error(`Server error: ${errorData.error || response.statusText}`);
+                            }).catch(err => {
+                                // If JSON parsing fails, throw original error
+                                if (err.name === 'SyntaxError') {
+                                    throw new Error(`Server error: ${response.statusText}`);
+                                }
+                                throw err;
+                            });
+                        }
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Upload response:', data);
+                    storeRecommendationsData(data);
+                    displayResults(data);
+                    
+                    // Show export PDF button
+                    exportPdfBtn.classList.remove('d-none');
+                })
+                .catch(error => {
+                    console.error('Error uploading file:', error);
+                    alert('Error uploading file: ' + error.message);
+                })
+                .finally(() => {
+                    loadingIndicator.classList.add('d-none');
+                });
+            });
+            
+            function displayResults(data) {
+                // Show results container
+                resultsContainer.classList.remove('d-none');
+                
+                console.log("Received data:", data);  // Debug log to see what data is received
+                
+                // Update summary stats
+                document.getElementById('conversation-count').textContent = data.conversation_count;
+                
+                // Calculate average time metrics
+                let avgRecommendationTime = 0;
+                let recommendationTimeCount = 0;
+                let avgFirstResponseTime = 0;
+                let firstResponseTimeCount = 0;
+                
+                // Track min/max values
+                let minFirstResponse = Infinity;
+                let maxFirstResponse = 0;
+                let minRecommendationTime = Infinity;
+                let maxRecommendationTime = 0;
+                
+                // Process response time metrics
+                data.metrics.forEach(metric => {
+                    if (metric.time_to_recommendation) {
+                        avgRecommendationTime += metric.time_to_recommendation;
+                        recommendationTimeCount++;
+                        
+                        minRecommendationTime = Math.min(minRecommendationTime, metric.time_to_recommendation);
+                        maxRecommendationTime = Math.max(maxRecommendationTime, metric.time_to_recommendation);
+                    }
+                    
+                    if (metric.time_to_first_response) {
+                        avgFirstResponseTime += metric.time_to_first_response;
+                        firstResponseTimeCount++;
+                        
+                        minFirstResponse = Math.min(minFirstResponse, metric.time_to_first_response);
+                        maxFirstResponse = Math.max(maxFirstResponse, metric.time_to_first_response);
+                    }
+                });
+                
+                // Calculate and display averages
+                if (recommendationTimeCount > 0) {
+                    avgRecommendationTime = avgRecommendationTime / recommendationTimeCount;
+                    document.getElementById('avg-recommendation-time').textContent = avgRecommendationTime.toFixed(1) + 's';
+                }
+                
+                if (firstResponseTimeCount > 0) {
+                    avgFirstResponseTime = avgFirstResponseTime / firstResponseTimeCount;
+                    document.getElementById('avg-first-response').textContent = avgFirstResponseTime.toFixed(1) + 's';
+                }
+                
+                // Display min/max values
+                if (minFirstResponse !== Infinity) {
+                    document.getElementById('min-first-response').textContent = `Min: ${minFirstResponse.toFixed(1)}s`;
+                    document.getElementById('max-first-response').textContent = `Max: ${maxFirstResponse.toFixed(1)}s`;
+                }
+                
+                if (minRecommendationTime !== Infinity) {
+                    document.getElementById('min-recommendation-time').textContent = `Min: ${minRecommendationTime.toFixed(1)}s`;
+                    document.getElementById('max-recommendation-time').textContent = `Max: ${maxRecommendationTime.toFixed(1)}s`;
+                }
+                
+                // Display response time chart - Add logging to debug data
+                console.log("Response time metrics:", data.metrics);
+                displayResponseTimeChart(data.metrics);
+                
+                // Update persona stats
+                if (data.persona_summary) {
+                    document.getElementById('matched-personas').textContent = 
+                        `${data.persona_summary.matched_conversations}/${data.conversation_count}`;
+                    
+                    // Create accuracy chart - Add logging to debug data
+                    console.log("Metrics for accuracy chart:", data.metrics.filter(m => 'recommendation_accuracy' in m));
+                    displayAccuracyChart(data.metrics);
+                    
+                    // Create accuracy distribution chart - Add logging
+                    console.log("Accuracy distribution:", data.persona_summary.accuracy_distribution);
+                    displayAccuracyDistributionChart(data.persona_summary.accuracy_distribution);
+                    
+                    // Update detailed recommendation analysis
+                    displayRecommendationAnalysis(data);
+                }
+                
+                // Display conversation list
+                displayConversationsList(data.metrics, data.recommendations);
+                
+                // Show first tab by default
+                const firstTabButton = document.querySelector('#analysisTab button:first-child');
+                if (firstTabButton) {
+                    firstTabButton.click();
+                }
+            }
+            
+            function displayResponseTimeChart(metrics) {
+                // Ensure we have data to display
+                if (!metrics || metrics.length === 0) {
+                    console.warn("No metrics data available for response time chart");
+                    return;
+                }
+                
+                // Prepare data for the chart
+                const conversationIds = [];
+                const firstResponseTimes = [];
+                const recommendationTimes = [];
+                
+                metrics.forEach(metric => {
+                    conversationIds.push(`Conv. ${metric.conversation_id + 1}`);
+                    firstResponseTimes.push(metric.time_to_first_response || 0);
+                    recommendationTimes.push(metric.time_to_recommendation || 0);
+                });
+                
+                console.log("Response time chart data:", { 
+                    labels: conversationIds, 
+                    firstResponseTimes, 
+                    recommendationTimes 
+                });
+                
+                // Create the chart
+                const ctx = document.getElementById('response-time-chart').getContext('2d');
+                
+                if (responseTimeChart) {
+                    responseTimeChart.destroy();
+                }
+                
+                responseTimeChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: conversationIds,
+                        datasets: [
+                            {
+                                label: 'Time to First Response (s)',
+                                data: firstResponseTimes,
+                                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Time to Recommendation (s)',
+                                data: recommendationTimes,
+                                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Time (seconds)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Conversation'
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${context.raw.toFixed(1)}s`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function displayAccuracyChart(metrics) {
+                // Prepare data for the chart
+                const conversationIds = [];
+                const accuracyValues = [];
+                const backgroundColors = [];
+                
+                metrics.forEach(metric => {
+                    if ('recommendation_accuracy' in metric) {
+                        conversationIds.push(`Conv. ${metric.conversation_id + 1}`);
+                        const accuracy = metric.recommendation_accuracy * 100;
+                        accuracyValues.push(accuracy);
+                        
+                        // Set color based on accuracy
+                        if (accuracy >= 75) {
+                            backgroundColors.push('rgba(40, 167, 69, 0.6)');
+                        } else if (accuracy >= 50) {
+                            backgroundColors.push('rgba(255, 193, 7, 0.6)');
+                        } else {
+                            backgroundColors.push('rgba(220, 53, 69, 0.6)');
+                        }
+                    }
+                });
+                
+                // Create the chart
+                const ctx = document.getElementById('accuracy-chart').getContext('2d');
+                
+                if (accuracyChart) {
+                    accuracyChart.destroy();
+                }
+                
+                accuracyChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: conversationIds,
+                        datasets: [{
+                            label: 'Accuracy (%)',
+                            data: accuracyValues,
+                            backgroundColor: backgroundColors,
+                            borderColor: backgroundColors.map(color => color.replace('0.6', '1')),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                title: {
+                                    display: true,
+                                    text: 'Accuracy (%)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Conversation'
+                                }
+                            }
+                        },
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `Accuracy: ${context.raw.toFixed(1)}%`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function displayAccuracyDistributionChart(distribution) {
+                // Prepare data for the chart
+                const labels = Object.keys(distribution);
+                const values = Object.values(distribution);
+                
+                // Create the chart
+                const ctx = document.getElementById('accuracy-distribution-chart').getContext('2d');
+                
+                if (accuracyDistChart) {
+                    accuracyDistChart.destroy();
+                }
+                
+                accuracyDistChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: [
+                                'rgba(220, 53, 69, 0.7)',
+                                'rgba(255, 193, 7, 0.7)',
+                                'rgba(40, 167, 69, 0.7)',
+                                'rgba(23, 162, 184, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(220, 53, 69, 1)',
+                                'rgba(255, 193, 7, 1)',
+                                'rgba(40, 167, 69, 1)',
+                                'rgba(23, 162, 184, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    boxWidth: 15,
+                                    padding: 15
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.raw;
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = Math.round((value / total) * 100);
+                                        return `${label}: ${value} (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function displayRecommendationAnalysis(data) {
+                // Update recommendation stats
+                const avgPrecision = data.persona_summary.avg_precision * 100;
+                const avgRecall = data.persona_summary.avg_recall * 100;
+                const avgAccuracy = data.persona_summary.avg_accuracy * 100;
+                
+                const precisionBar = document.getElementById('avg-precision-bar');
+                const recallBar = document.getElementById('avg-recall-bar');
+                const accuracyBar = document.getElementById('avg-accuracy-bar');
+                
+                precisionBar.style.width = `${avgPrecision}%`;
+                precisionBar.textContent = `${avgPrecision.toFixed(1)}%`;
+                recallBar.style.width = `${avgRecall}%`;
+                recallBar.textContent = `${avgRecall.toFixed(1)}%`;
+                accuracyBar.style.width = `${avgAccuracy}%`;
+                accuracyBar.textContent = `${avgAccuracy.toFixed(1)}%`;
+                
+                // Create recommendation count chart
+                displayRecommendationCountChart(data.persona_summary.recommendation_counts);
+                
+                // Create metrics distribution chart
+                displayMetricsDistributionChart(data.metrics);
+                
+                // Update comparison table
+                const tableBody = document.querySelector('#recommendations-comparison-table tbody');
+                tableBody.innerHTML = '';
+                
+                data.recommendations.forEach(rec => {
+                    if (!rec.expected_restaurants) return;
+                    
+                    const row = document.createElement('tr');
+                    
+                    // Create cell for conversation ID
+                    const idCell = document.createElement('td');
+                    idCell.className = 'text-center';
+                    idCell.innerHTML = `<span class="badge bg-primary">${rec.conversation_id + 1}</span>`;
+                    row.appendChild(idCell);
+                    
+                    // Create cell for persona ID
+                    const personaCell = document.createElement('td');
+                    personaCell.className = 'text-center small text-nowrap';
+                    if (rec.persona_id) {
+                        personaCell.innerHTML = `<span class="badge bg-info" 
+                            title="${rec.persona_description || 'No description'}">${rec.persona_id}</span>`;
+                    } else {
+                        personaCell.innerHTML = '<span class="badge bg-secondary">N/A</span>';
+                    }
+                    row.appendChild(personaCell);
+                    
+                    // Create cell for request
+                    const requestCell = document.createElement('td');
+                    requestCell.className = 'small text-wrap';
+                    requestCell.style.fontSize = '0.8rem';
+                    requestCell.style.maxWidth = '150px';
+                    requestCell.title = rec.request; // Add tooltip with full text
+                    
+                    // Truncate request text if too long
+                    const maxLength = 50;
+                    const displayText = rec.request.length > maxLength ? 
+                        rec.request.substring(0, maxLength) + '...' : rec.request;
+                    requestCell.textContent = displayText;
+                    row.appendChild(requestCell);
+                    
+                    // Create cell for expected recommendations
+                    const expectedCell = document.createElement('td');
+                    expectedCell.className = 'text-wrap';
+                    expectedCell.style.fontSize = '0.8rem';
+                    
+                    // Create badges for expected recommendations - more compact
+                    const badgeHtml = rec.expected_restaurants.map(r => {
+                        const isFound = rec.potential_restaurants.some(a => 
+                            isSameRestaurant(r, a)
+                        );
+                        const badgeClass = isFound ? 'bg-success' : 'bg-secondary';
+                        // Extract first words to keep badges smaller
+                        const displayText = r.split(' ').slice(0, 3).join(' ');
+                        return `<span class="badge ${badgeClass} me-1 mb-1 d-inline-block" title="${r}">${displayText}</span>`;
+                    }).join('');
+                    
+                    expectedCell.innerHTML = `
+                        <div class="d-flex flex-wrap">
+                            ${badgeHtml}
+                        </div>
+                        <div class="small text-muted" style="font-size: 0.75rem">Total: ${rec.expected_restaurants.length}</div>
+                    `;
+                    row.appendChild(expectedCell);
+                    
+                    // Create cell for actual recommendations - more compact
+                    const actualCell = document.createElement('td');
+                    actualCell.className = 'text-wrap';
+                    actualCell.style.fontSize = '0.8rem';
+                    
+                    // Create badges for actual recommendations - more compact
+                    const actualBadges = rec.potential_restaurants.map((r, i) => {
+                        const isMatch = rec.expected_restaurants.some(exp => 
+                            isSameRestaurant(exp, r)
+                        );
+                        const bgClass = isMatch ? 'bg-success' : 'bg-danger';
+                        // Extract first words to keep badges smaller
+                        const displayText = r.split(' ').slice(0, 3).join(' ');
+                        return `<span class="badge ${bgClass} me-1 mb-1 d-inline-block" title="${r}">${i+1}. ${displayText}</span>`;
+                    }).join('');
+                    
+                    actualCell.innerHTML = `
+                        <div class="d-flex flex-wrap">
+                            ${actualBadges}
+                        </div>
+                    `;
+                    row.appendChild(actualCell);
+                    
+                    // Create cell for score and actions
+                    const scoreCell = document.createElement('td');
+                    scoreCell.className = 'text-center align-middle';
+                    
+                    const accuracy = (rec.accuracy * 100).toFixed(0);
+                    let scoreClass = 'danger';
+                    if (accuracy >= 75) scoreClass = 'success';
+                    else if (accuracy >= 50) scoreClass = 'warning';
+                    
+                    // Create tooltip for metrics
+                    const metricsTooltip = `
+                        Accuracy: ${accuracy}%<br>
+                        Precision: ${(rec.accuracy * rec.expected_restaurants.length / rec.potential_restaurants.length * 100).toFixed(0)}%<br>
+                        Found: ${rec.potential_restaurants.filter(r => 
+                            rec.expected_restaurants.some(exp => 
+                                exp.toLowerCase().includes(r.toLowerCase()) || 
+                                r.toLowerCase().includes(exp.toLowerCase())
+                            )
+                        ).length}/${rec.expected_restaurants.length}
+                    `;
+                    
+                    // Add score pill with details button
+                    scoreCell.innerHTML = `
+                        <div class="d-flex flex-column align-items-center">
+                            <div class="mb-1">
+                                <span class="badge bg-${scoreClass} p-2">${accuracy}%</span>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-primary view-conv-btn" 
+                                    data-conversation-id="${rec.conversation_id}"
+                                    data-bs-toggle="tooltip" title="View conversation">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    row.appendChild(scoreCell);
+                    
+                    tableBody.appendChild(row);
+                });
+                
+                // Initialize tooltips
+                const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+                tooltips.forEach(tooltip => {
+                    new bootstrap.Tooltip(tooltip);
+                });
+                
+                // Add event listeners for view conversation buttons
+                document.querySelectorAll('.view-conv-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const conversationId = this.dataset.conversationId;
+                        loadConversation(conversationId);
+                        
+                        // Switch to conversations tab
+                        document.getElementById('conversations-tab').click();
+                        
+                        // Highlight the selected conversation
+                        document.querySelectorAll('#conversations-list a.active').forEach(item => {
+                            item.classList.remove('active');
+                        });
+                        document.querySelector(`#conversations-list a[data-conversation-id="${conversationId}"]`).classList.add('active');
+                    });
+                });
+            }
+            
+            function displayRecommendationCountChart(countData) {
+                const ctx = document.getElementById('recommendation-count-chart').getContext('2d');
+                
+                if (recommendationCountChart) {
+                    recommendationCountChart.destroy();
+                }
+                
+                // Convert data to arrays
+                const counts = Object.keys(countData).map(Number).sort((a, b) => a - b);
+                const frequencies = counts.map(c => countData[c]);
+                
+                recommendationCountChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: counts.map(c => `${c} recs`),
+                        datasets: [{
+                            label: 'Number of Conversations',
+                            data: frequencies,
+                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Frequency'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Number of Recommendations'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.raw} conversations`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function displayMetricsDistributionChart(metrics) {
+                const ctx = document.getElementById('metrics-distribution-chart').getContext('2d');
+                
+                if (metricsDistributionChart) {
+                    metricsDistributionChart.destroy();
+                }
+                
+                // Extract metrics
+                const accuracies = [];
+                const precisions = [];
+                const recalls = [];
+                
+                metrics.forEach(metric => {
+                    if ('recommendation_accuracy' in metric) {
+                        const accuracy = metric.recommendation_accuracy;
+                        accuracies.push(accuracy);
+                        
+                        // Calculate precision and recall based on available data
+                        const matchingRec = recommendationsData.find(r => r.conversation_id === metric.conversation_id);
+                        if (matchingRec && matchingRec.potential_restaurants && matchingRec.expected_restaurants) {
+                            const precision = accuracy * matchingRec.expected_restaurants.length / matchingRec.potential_restaurants.length;
+                            precisions.push(precision);
+                            recalls.push(accuracy); // Recall is the same as accuracy in this case
+                        }
+                    }
+                });
+                
+                metricsDistributionChart = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['0-25%', '26-50%', '51-75%', '76-100%'],
+                        datasets: [
+                            {
+                                label: 'Accuracy',
+                                data: [
+                                    accuracies.filter(v => v <= 0.25).length,
+                                    accuracies.filter(v => v > 0.25 && v <= 0.5).length,
+                                    accuracies.filter(v => v > 0.5 && v <= 0.75).length,
+                                    accuracies.filter(v => v > 0.75).length
+                                ],
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Precision',
+                                data: [
+                                    precisions.filter(v => v <= 0.25).length,
+                                    precisions.filter(v => v > 0.25 && v <= 0.5).length,
+                                    precisions.filter(v => v > 0.5 && v <= 0.75).length,
+                                    precisions.filter(v => v > 0.75).length
+                                ],
+                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                angleLines: {
+                                    display: true
+                                },
+                                suggestedMin: 0
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Store recommendations data when received
+            let recommendationsData = [];
+            function storeRecommendationsData(data) {
+                recommendationsData = data.recommendations || [];
+            }
+            
+            // Function to display the conversations list
+            function displayConversationsList(metrics, recommendations) {
+                // Clear existing list
+                conversationsList.innerHTML = '';
+                
+                // Collect all persona IDs for filter dropdown
+                const personaIds = new Set();
+                
+                // Add each conversation to the list
+                metrics.forEach(metric => {
+                    const listItem = document.createElement('a');
+                    listItem.href = '#';
+                    listItem.className = 'list-group-item list-group-item-action conversation-list-item';
+                    
+                    // Ensure request is not null before using it
+                    const request = metric.request || "No request available";
+                    
+                    // Build the content
+                    let content = `
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Conversation ${metric.conversation_id + 1}</h6>`;
+                    
+                    // Add accuracy badge if available
+                    if ('recommendation_accuracy' in metric) {
+                        const accuracy = metric.recommendation_accuracy * 100;
+                        let badgeClass;
+                        
+                        if (accuracy >= 75) {
+                            badgeClass = 'bg-success';
+                            listItem.dataset.accuracyLevel = 'high';
+                        } else if (accuracy >= 50) {
+                            badgeClass = 'bg-warning';
+                            listItem.dataset.accuracyLevel = 'medium';
+                        } else {
+                            badgeClass = 'bg-danger';
+                            listItem.dataset.accuracyLevel = 'low';
+                        }
+                        
+                        content += `<span class="badge ${badgeClass}">${accuracy.toFixed(0)}%</span>`;
+                        listItem.dataset.accuracy = accuracy.toFixed(0);
+                    }
+                    
+                    // Add timestamp for sorting
+                    if (metric.time_to_first_response) {
+                        listItem.dataset.responseTime = metric.time_to_first_response;
+                    }
+                    
+                    content += `</div>
+                        <p class="mb-1 text-truncate">${request}</p>`;
+                    
+                    // Add persona info if available
+                    if ('persona_id' in metric) {
+                        listItem.dataset.personaId = metric.persona_id;
+                        listItem.dataset.personaDescription = metric.persona_description;
+                        content += `<small class="text-muted"><i class="bi bi-person me-1"></i>${metric.persona_id}</small>`;
+                        
+                        // Add to persona filter options
+                        personaIds.add(metric.persona_id);
+                    }
+                    
+                    // Add recommendation info if available
+                    const recommendation = recommendations.find(r => r.conversation_id === metric.conversation_id);
+                    if (recommendation) {
+                        listItem.dataset.restaurants = recommendation.potential_restaurants.join(', ');
+                        if ('expected_restaurants' in recommendation) {
+                            listItem.dataset.expectedRestaurants = recommendation.expected_restaurants.join(', ');
+                        }
+                    }
+                    
+                    // Add timestamp display
+                    if (metric.time_to_recommendation) {
+                        content += `<small class="ms-2 text-muted"><i class="bi bi-clock me-1"></i>${metric.time_to_recommendation.toFixed(1)}s</small>`;
+                    }
+                    
+                    listItem.innerHTML = content;
+                    listItem.dataset.conversationId = metric.conversation_id;
+                    listItem.dataset.request = request.toLowerCase(); // Fix null request issue here
+                    
+                    listItem.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        loadConversation(this.dataset.conversationId);
+                        
+                        // Highlight the selected conversation
+                        document.querySelectorAll('#conversations-list a.active').forEach(item => {
+                            item.classList.remove('active');
+                        });
+                        this.classList.add('active');
+                    });
+                    
+                    conversationsList.appendChild(listItem);
+                });
+                
+                // Update conversation count
+                document.getElementById('conversations-count').textContent = metrics.length;
+                
+                // Populate persona filter dropdown
+                const personaFilter = document.getElementById('persona-filter');
+                personaFilter.innerHTML = '<option value="">All Personas</option>';
+                
+                Array.from(personaIds).sort().forEach(personaId => {
+                    const option = document.createElement('option');
+                    option.value = personaId;
+                    option.textContent = personaId;
+                    personaFilter.appendChild(option);
+                });
+                
+                // Setup filter functionality
+                setupConversationFilters();
+            }
+            
+            // Setup filter functionality for conversations
+            function setupConversationFilters() {
+                const searchInput = document.getElementById('conversation-search');
+                const personaFilter = document.getElementById('persona-filter');
+                const accuracyFilter = document.getElementById('accuracy-filter');
+                const resetFiltersBtn = document.getElementById('reset-filters');
+                const timeSortToggle = document.getElementById('time-sort-toggle');
+                
+                // Function to apply filters
+                function applyFilters() {
+                    const searchTerm = searchInput.value.toLowerCase();
+                    const selectedPersona = personaFilter.value;
+                    const selectedAccuracy = accuracyFilter.value;
+                    
+                    let visibleCount = 0;
+                    
+                    // Filter conversation items
+                    document.querySelectorAll('#conversations-list a').forEach(item => {
+                        // Check search term
+                        const matchesSearch = !searchTerm || 
+                                             item.dataset.request && item.dataset.request.includes(searchTerm);
+                        
+                        // Check persona filter
+                        const matchesPersona = !selectedPersona || 
+                                             item.dataset.personaId === selectedPersona;
+                        
+                        // Check accuracy filter
+                        const matchesAccuracy = !selectedAccuracy || 
+                                              item.dataset.accuracyLevel === selectedAccuracy;
+                        
+                        // Show/hide based on filter matches
+                        if (matchesSearch && matchesPersona && matchesAccuracy) {
+                            item.classList.remove('d-none');
+                            visibleCount++;
+                        } else {
+                            item.classList.add('d-none');
+                        }
+                    });
+                    
+                    // Update count
+                    document.getElementById('conversations-count').textContent = visibleCount;
+                }
+                
+                // Add event listeners
+                searchInput.addEventListener('input', applyFilters);
+                personaFilter.addEventListener('change', applyFilters);
+                accuracyFilter.addEventListener('change', applyFilters);
+                
+                // Reset filters
+                resetFiltersBtn.addEventListener('click', function() {
+                    searchInput.value = '';
+                    personaFilter.selectedIndex = 0;
+                    accuracyFilter.selectedIndex = 0;
+                    applyFilters();
+                });
+                
+                // Sort by response time
+                timeSortToggle.addEventListener('change', function() {
+                    const listItems = Array.from(document.querySelectorAll('#conversations-list a'));
+                    const sortedItems = listItems.sort((a, b) => {
+                        if (timeSortToggle.checked) {
+                            return (parseFloat(a.dataset.responseTime) || 999) - (parseFloat(b.dataset.responseTime) || 999);
+                        } else {
+                            return parseInt(a.dataset.conversationId) - parseInt(b.dataset.conversationId);
+                        }
+                    });
+                    
+                    // Re-append in sorted order
+                    const parentList = document.getElementById('conversations-list');
+                    parentList.innerHTML = '';
+                    sortedItems.forEach(item => parentList.appendChild(item));
+                });
+            }
+
+            function loadConversation(conversationId) {
+                // Fetch conversation details
+                fetch(`${FLASK_SERVER_URL}/conversation/${conversationId}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to load conversation');
+                        }
+                        return response.json();
+                    })
+                    .then(conversation => {
+                        // Reset debug toggle to default state (off)
+                        debugToggle.checked = false;
+                        conversationContainer.classList.add('hide-debug');
+                        
+                        displayConversation(conversation, conversationId);
+                    })
+                    .catch(error => {
+                        console.error('Error loading conversation:', error);
+                    });
+            }
+            
+            // PDF Export functionality
+            exportPdfBtn.addEventListener('click', exportPDF);
+            exportPdfMobileBtn.addEventListener('click', exportPDF);
+            
+            // Define the PDF export function
+            function exportPDF() {
+                // Show loading indicator
+                loadingIndicator.classList.remove('d-none');
+                
+                try {
+                    // Get all active chart instances
+                    const activeCharts = [
+                        responseTimeChart,
+                        accuracyChart, 
+                        accuracyDistChart,
+                        recommendationCountChart,
+                        metricsDistributionChart
+                    ].filter(chart => chart !== null);
+                    
+                    console.log("Active charts for export:", activeCharts.length);
+                    
+                    // Define chart configurations for the PDF
+                    const chartConfigs = [
+                        {
+                            chartId: 'response-time-chart',
+                            title: 'Response Time Analysis'
+                        },
+                        {
+                            chartId: 'accuracy-chart',
+                            title: 'Recommendation Accuracy'
+                        },
+                        {
+                            chartId: 'accuracy-distribution-chart',
+                            title: 'Accuracy Distribution'
+                        },
+                        {
+                            chartId: 'recommendation-count-chart',
+                            title: 'Recommendation Counts'
+                        },
+                        {
+                            chartId: 'metrics-distribution-chart',
+                            title: 'Metrics Distribution'
+                        }
+                    ];
+                    
+                    // Use the ChartExporter utility to create the PDF
+                    ChartExporter.createPDFReport(
+                        recommendationsData,
+                        chartConfigs,
+                        function(err) {
+                            loadingIndicator.classList.add('d-none');
+                            if (err) {
+                                alert('There was a problem generating the PDF. Please try again.');
+                                console.error('PDF generation error:', err);
+                            }
+                        }
+                    );
+                } catch (error) {
+                    console.error('Error initiating PDF export:', error);
+                    alert('Failed to generate PDF. Please try again or check console for details.');
+                    loadingIndicator.classList.add('d-none');
+                }
+            }
+            
+            // Move displayConversation inside the DOMContentLoaded scope
+            function displayConversation(conversation, conversationId) {
+                // Hide placeholder, show details
+                document.getElementById('no-conversation-placeholder').classList.add('d-none');
+                conversationDetails.classList.remove('d-none');
+                
+                // Set conversation title
+                conversationTitle.textContent = `Conversation ${parseInt(conversationId) + 1}`;
+                
+                // Clear previous content
+                conversationContainer.innerHTML = '';
+                conversationPersonaDetails.innerHTML = '';
+                
+                // Set up debug toggle functionality
+                debugToggle.addEventListener('change', function() {
+                    if (this.checked) {
+                        conversationContainer.classList.remove('hide-debug');
+                    } else {
+                        conversationContainer.classList.add('hide-debug');
+                    }
+                });
+                
+                // Hide debug messages by default
+                conversationContainer.classList.add('hide-debug');
+                
+                // Format and display conversation date
+                const firstMsg = conversation[0];
+                if (firstMsg && firstMsg.timestamp) {
+                    const msgDate = new Date(firstMsg.timestamp);
+                    document.getElementById('conv-date').textContent = msgDate.toLocaleDateString();
+                }
+
+                // Set message count
+                document.getElementById('conv-message-count').textContent = `${conversation.length} messages`;
+                
+                // Calculate and display time metrics
+                let requestTime = null;
+                let firstResponseTime = null;
+                let recommendationTime = null;
+
+                conversation.forEach(msg => {
+                    if (msg.type === 'user_request' && !requestTime) {
+                        requestTime = new Date(msg.timestamp);
+                    }
+                    if (msg.sender !== 'Wagner' && msg.type !== 'debug' && !firstResponseTime) {
+                        firstResponseTime = new Date(msg.timestamp);
+                    }
+                    if (msg.type === 'recommendation' && !recommendationTime) {
+                        recommendationTime = new Date(msg.timestamp);
+                    }
+                });
+
+                if (requestTime && firstResponseTime) {
+                    const timeToFirst = (firstResponseTime - requestTime) / 1000;
+                    document.getElementById('conv-time-to-first').textContent = `${timeToFirst.toFixed(1)}s to first response`;
+                }
+
+                if (requestTime && recommendationTime) {
+                    const timeToRec = (recommendationTime - requestTime) / 1000;
+                    document.getElementById('conv-time-to-rec').textContent = `${timeToRec.toFixed(1)}s to recommendation`;
+                }
+                
+                // Display persona information if available
+                const personaId = firstMsg.persona_id;
+                const personaDescription = firstMsg.persona_description;
+                
+                if (personaId) {
+                    personaBadge.textContent = personaId;
+                    personaBadge.classList.remove('d-none');
+                    
+                    if (personaDescription) {
+                        // Create persona details section
+                        const personaCard = document.createElement('div');
+                        personaCard.className = 'card mb-3';
+                        
+                        personaCard.innerHTML = `
+                            <div class="card-header bg-info bg-opacity-10">
+                                <i class="bi bi-person me-2"></i>Persona Profile
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2"><strong>ID:</strong> ${personaId}</p>
+                                <p class="mb-0"><strong>Description:</strong> ${personaDescription}</p>
+                            </div>
+                        `;
+                        conversationPersonaDetails.appendChild(personaCard);
+                    }
+                    
+                    // Add recommendation evaluation if available
+                    let recommendationEvaluation = null;
+                    conversation.forEach(msg => {
+                        if (msg.type === 'recommendation' && msg.recommendation_evaluation) {
+                            recommendationEvaluation = msg.recommendation_evaluation;
+                        }
+                    });
+                    
+                    if (recommendationEvaluation) {
+                        // Create recommendation evaluation section
+                        const evalCard = document.createElement('div');
+                        evalCard.className = 'card mb-3';
+                        
+                        // Calculate metrics
+                        const accuracy = (recommendationEvaluation.accuracy * 100).toFixed(0);
+                        const precision = (recommendationEvaluation.precision * 100).toFixed(0);
+                        const recall = (recommendationEvaluation.recall * 100).toFixed(0);
+                        
+                        // Create stats container
+                        let statsHtml = `
+                        <div class="conversation-stats">
+                            <div class="stat-card">
+                                <div class="stat-value">${accuracy}%</div>
+                                <div class="stat-label">ACCURACY</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">${precision}%</div>
+                                <div class="stat-label">PRECISION</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">${recall}%</div>
+                                <div class="stat-label">RECALL</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">${recommendationEvaluation.matched_items.length}</div>
+                                <div class="stat-label">MATCHED</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">${recommendationEvaluation.missing_count}</div>
+                                <div class="stat-label">MISSING</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">${recommendationEvaluation.extra_count}</div>
+                                <div class="stat-label">EXTRA</div>
+                            </div>
+                        </div>`;
+                        
+                        evalCard.innerHTML = `
+                            <div class="card-header bg-primary bg-opacity-10">
+                                <i class="bi bi-bar-chart me-2"></i>Recommendation Evaluation
+                            </div>
+                            <div class="card-body">
+                                ${statsHtml}
+                            </div>
+                        `;
+                        conversationPersonaDetails.appendChild(evalCard);
+                        
+                        // Show restaurant matches
+                        const matchesContainer = document.getElementById('restaurant-matches');
+                        const matchesContentContainer = document.getElementById('restaurant-matches-container');
+                        matchesContentContainer.innerHTML = '';
+                        
+                        if (recommendationEvaluation.expected_recommendations && 
+                            recommendationEvaluation.actual_recommendations) {
+                            
+                            matchesContainer.classList.remove('d-none');
+                            
+                            // Create a card for each expected restaurant
+                            recommendationEvaluation.expected_recommendations.forEach((restaurant, index) => {
+                                const card = document.createElement('div');
+                                card.className = 'restaurant-match';
+                                
+                                // Check if this restaurant was found in actual recommendations
+                                const found = recommendationEvaluation.actual_recommendations.some(actual => 
+                                    isSameRestaurant(restaurant, actual)
+                                );
+                                
+                                const badgeClass = found ? 'bg-success' : 'bg-danger';
+                                const statusText = found ? 'Found' : 'Missing';
+                                
+                                card.innerHTML = `
+                                    <div class="restaurant-match-header">
+                                        <div>Expected #${index + 1}: ${restaurant}</div>
+                                        <div><span class="badge ${badgeClass}">${statusText}</span></div>
+                                    </div>
+                                `;
+                                matchesContentContainer.appendChild(card);
+                            });
+                        }
+                    }
+                } else {
+                    personaBadge.classList.add('d-none');
+                }
+                
+                // Display messages
+                conversation.forEach((msg, index) => {
+                    const messageDiv = document.createElement('div');
+                    
+                    // Determine message class based on type
+                    if (msg.type === 'user_request') {
+                        messageDiv.className = 'message user';
+                    } else if (msg.type === 'debug') {
+                        messageDiv.className = 'message debug';
+                    } else {
+                        messageDiv.className = 'message concierge';
+                    }
+                    
+                    // Format timestamp
+                    let formattedTime = '';
+                    if (msg.timestamp) {
+                        const msgTime = new Date(msg.timestamp);
+                        formattedTime = msgTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    }
+                    
+                    // Create message content
+                    let messageContent = `
+                        <div class="message-timestamp">${formattedTime}</div>
+                        <div class="message-sender">${msg.sender}</div>
+                        <div class="message-content">${msg.content.replace(/\n/g, '<br>')}</div>
+                    `;
+                    
+                    // Add debug info if available
+                    if (msg.type === 'debug' && msg.debug_info) {
+                        messageContent += `
+                            <div class="mt-2">
+                                <strong>Debug Type:</strong> ${msg.debug_info.type}
+                            </div>
+                        `;
+                        
+                        // Show the first few items from debug data
+                        if (msg.debug_info.data) {
+                            let dataPreview = '';
+                            
+                            if (Array.isArray(msg.debug_info.data)) {
+                                dataPreview = msg.debug_info.data.slice(0, 3).join(', ');
+                                if (msg.debug_info.data.length > 3) {
+                                    dataPreview += ` ...and ${msg.debug_info.data.length - 3} more`;
+                                }
+                            } else if (typeof msg.debug_info.data === 'object') {
+                                const keys = Object.keys(msg.debug_info.data);
+                                dataPreview = keys.slice(0, 3).join(', ');
+                                if (keys.length > 3) {
+                                    dataPreview += ` ...and ${keys.length - 3} more keys`;
+                                }
+                            }
+                            
+                            messageContent += `
+                                <div>
+                                    <strong>Data:</strong> ${dataPreview}
+                                </div>
+                            `;
+                        }
+                    }
+                    
+                    messageDiv.innerHTML = messageContent;
+                    conversationContainer.appendChild(messageDiv);
+                });
+                
+                // Add export functionality
+                document.getElementById('export-conversation').onclick = function() {
+                    exportConversationToText(conversation, conversationId);
+                };
+            }
+            
+            // Function to export conversation to text file
+            function exportConversationToText(conversation, conversationId) {
+                // Format the conversation as text
+                let text = `Conversation ${parseInt(conversationId) + 1}\n`;
+                text += `=============================\n\n`;
+                
+                // Add persona info if available
+                if (conversation[0].persona_id) {
+                    text += `Persona: ${conversation[0].persona_id}\n`;
+                    if (conversation[0].persona_description) {
+                        text += `Description: ${conversation[0].persona_description}\n`;
+                    }
+                    text += `\n`;
+                }
+                
+                // Add messages
+                conversation.forEach(msg => {
+                    const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+                    text += `${time} - ${msg.sender} (${msg.type}):\n`;
+                    text += `${msg.content}\n\n`;
+                });
+                
+                // Add evaluation if available
+                conversation.forEach(msg => {
+                    if (msg.type === 'recommendation' && msg.recommendation_evaluation) {
+                        const eval = msg.recommendation_evaluation;
+                        text += `\nRECOMMENDATION EVALUATION:\n`;
+                        text += `===========================\n`;
+                        text += `Accuracy: ${(eval.accuracy * 100).toFixed(0)}%\n`;
+                        text += `Precision: ${(eval.precision * 100).toFixed(0)}%\n`;
+                        text += `Recall: ${(eval.recall * 100).toFixed(0)}%\n`;
+                        
+                        text += `\nEXPECTED RESTAURANTS:\n`;
+                        eval.expected_recommendations.forEach((r, i) => {
+                            text += `${i+1}. ${r}\n`;
+                        });
+                        
+                        text += `\nACTUAL RECOMMENDATIONS:\n`;
+                        eval.actual_recommendations.forEach((r, i) => {
+                            text += `${i+1}. ${r}\n`;
+                        });
+                    }
+                });
+                
+                // Create and trigger download
+                const blob = new Blob([text], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `conversation_${parseInt(conversationId) + 1}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+            
+            // Add this helper function to the script section
+            function isSameRestaurant(name1, name2) {
+                // Convert to lowercase for case-insensitive comparison
+                name1 = name1.toLowerCase().trim();
+                name2 = name2.toLowerCase().trim();
+                
+                // Exact match
+                if (name1 === name2) {
+                    return true;
+                }
+                
+                // Special case for restaurants with special characters or common words
+                // Split into words and check word similarity
+                const words1 = new Set(name1.split(/\s+/));
+                const words2 = new Set(name2.split(/\s+/));
+                
+                // Common words in restaurant names that shouldn't determine a match by themselves
+                const commonWords = new Set(['the', 'restaurant', 'café', 'cafe', 'bar', 'grill', 'bistro', 'kitchen']);
+                
+                // Remove common words for comparison
+                const filteredWords1 = new Set([...words1].filter(word => !commonWords.has(word)));
+                const filteredWords2 = new Set([...words2].filter(word => !commonWords.has(word)));
+                
+                // Check if they share substantial words
+                if (filteredWords1.size > 0 && filteredWords2.size > 0) {
+                    const intersection = new Set([...filteredWords1].filter(x => filteredWords2.has(x)));
+                    
+                    // Only consider a match if they share significant unique words
+                    const minSize = Math.min(filteredWords1.size, filteredWords2.size);
+                    if (intersection.size >= minSize * 0.8) {
+                        // Additional length check to distinguish "Parigi" from "Bistrot Parigi"
+                        const shorter = name1.length < name2.length ? name1 : name2;
+                        const longer = name2.length > name1.length ? name2 : name1;
+                        
+                        // If the longer name is significantly longer, it's likely a different restaurant
+                        if (longer.length > shorter.length * 1.5) {
+                            // Check if shorter name appears as a complete word in longer name
+                            const longerWords = longer.split(/\s+/);
+                            if (longerWords.includes(shorter) && longerWords.length > 1) {
+                                return false;
+                            }
+                        }
+                        
+                        return true;
+                    }
+                }
+                
+                return false;
+            }
+        });
+    </script>
+</body>
+</html>

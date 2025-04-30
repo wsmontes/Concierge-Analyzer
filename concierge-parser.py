@@ -1,0 +1,789 @@
+import re
+import json
+import pandas as pd
+from datetime import datetime
+import ast
+from flask import Flask, render_template, request, jsonify
+import plotly.express as px
+import plotly.graph_objects as go
+import networkx as nx
+from collections import defaultdict
+import logging
+import traceback
+from flask_cors import CORS  # Import CORS extension
+# Add a .env file to store environment variables
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Use environment variables in the Flask app
+FLASK_SERVER_URL = os.getenv('FLASK_SERVER_URL', 'http://localhost:5000')
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, 
+                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+class PersonaAnalyzer:
+    def __init__(self, csv_path=None):
+        self.personas = []
+        self.persona_inputs = {}
+        self.persona_recommendations = {}
+        
+        if csv_path:
+            self.load_personas_from_csv(csv_path)
+    
+    def load_personas_from_csv(self, csv_path):
+        """Load personas from CSV file"""
+        try:
+            logger.info(f"Loading personas from: {csv_path}")
+            df = pd.read_csv(csv_path)
+            
+            # Process each row in the CSV
+            for _, row in df.iterrows():
+                persona_id = row.get('No.')
+                if not isinstance(persona_id, str) or not persona_id:
+                    continue
+                    
+                persona = row.get('PERSONA', '')
+                input_text = row.get('Input', '')
+                
+                # Get the recommended options (up to 3)
+                options = []
+                for i in range(1, 4):
+                    option_col = f'Anwar - Option {i}'
+                    if option_col in row and pd.notna(row[option_col]):
+                        options.append(row[option_col])
+                
+                # Store the persona information
+                persona_info = {
+                    'id': persona_id,
+                    'description': persona,
+                    'input': input_text,
+                    'recommendations': options
+                }
+                
+                self.personas.append(persona_info)
+                
+                # Create lookup dictionaries for faster matching
+                if input_text:
+                    self.persona_inputs[input_text.lower()] = persona_id
+                
+                # Store recommendations by persona ID
+                self.persona_recommendations[persona_id] = options
+            
+            logger.info(f"Loaded {len(self.personas)} personas")
+            return True
+        except Exception as e:
+            logger.error(f"Error loading personas from CSV: {str(e)}")
+            logger.error(traceback.format_exc())
+            return False
+    
+    def match_conversation_to_persona(self, conversation):
+        """Match a conversation to a persona based on user request"""
+        user_request = next((msg['content'] for msg in conversation if msg['type'] == 'user_request'), None)
+        
+        if not user_request:
+            return None
+            
+        # Try exact match first
+        user_request_lower = user_request.lower().strip()
+        if user_request_lower in self.persona_inputs:
+            return self.persona_inputs[user_request_lower]
+            
+        # If no exact match, try fuzzy matching
+        for input_text, persona_id in self.persona_inputs.items():
+            # Simple similarity check - percentage of input_text words in user_request
+            input_words = set(input_text.lower().split())
+            request_words = set(user_request_lower.split())
+            
+            common_words = input_words.intersection(request_words)
+            
+            # If more than 70% of the words match, consider it a match
+            if len(common_words) >= 0.7 * len(input_words):
+                return persona_id
+                
+        return None
+    
+    def evaluate_recommendations(self, conversation, persona_id):
+        """Evaluate how well the recommendations match the expected ones for the persona"""
+        if not persona_id or persona_id not in self.persona_recommendations:
+            return {
+                'matched': False,
+                'expected_recommendations': [],
+                'actual_recommendations': [],
+                'accuracy': 0,
+                'precision': 0,
+                'recall': 0,
+                'extra_count': 0,
+                'missing_count': 0,
+                'position_analysis': []
+            }
+            
+        # Get expected recommendations for this persona
+        expected = self.persona_recommendations.get(persona_id, [])
+        
+        # Extract actual recommendations from the conversation
+        actual = []
+        for msg in conversation:
+            if msg['type'] == 'recommendation':
+                content = msg['content']
+                # Extract restaurant names using regex
+                restaurant_pattern = r'- ([^:]+?)(?=\s*–|\s*-|\s*\n|$)'
+                extracted = re.findall(restaurant_pattern, content)
+                actual = [rest.strip() for rest in extracted]
+                break
+        
+        # Calculate accuracy (percentage of expected recommendations present in actual)
+        matches = 0
+        matched_items = []
+        position_analysis = []
+        
+        for i, exp in enumerate(expected):
+            matched = False
+            matched_position = -1
+            for j, act in enumerate(actual):
+                # More precise matching algorithm to avoid confusing similar restaurant names
+                # Check for exact match (case-insensitive) or high similarity
+                if self._is_same_restaurant(exp, act):
+                    matched = True
+                    matched_items.append(exp)
+                    matched_position = j
+                    break
+            
+            # Record position analysis
+            position_analysis.append({
+                'expected': exp,
+                'found': matched,
+                'position': matched_position,
+                'position_score': 1.0 if matched_position == i else 
+                                  0.67 if matched_position >= 0 and matched_position < len(expected) else
+                                  0.33 if matched_position >= 0 else 0
+            })
+            
+            if matched:
+                matches += 1
+        
+        # Calculate metrics
+        accuracy = matches / len(expected) if expected else 0
+        precision = matches / len(actual) if actual else 0
+        recall = matches / len(expected) if expected else 0
+        
+        # Count extra and missing recommendations
+        extra_count = len(actual) - matches if len(actual) > matches else 0
+        missing_count = len(expected) - matches
+        
+        # Get list of extra recommendations
+        extra_recommendations = [rec for rec in actual if not any(
+            self._is_same_restaurant(exp, rec) for exp in expected
+        )]
+        
+        return {
+            'matched': True,
+            'expected_recommendations': expected,
+            'actual_recommendations': actual,
+            'matched_items': matched_items,
+            'extra_recommendations': extra_recommendations,
+            'accuracy': accuracy,
+            'precision': precision,
+            'recall': recall,
+            'extra_count': extra_count,
+            'missing_count': missing_count,
+            'position_analysis': position_analysis
+        }
+    
+    def _is_same_restaurant(self, name1, name2):
+        """
+        More precise algorithm to determine if two restaurant names refer to the same place
+        """
+        # Convert to lowercase for case-insensitive comparison
+        name1 = name1.lower().strip()
+        name2 = name2.lower().strip()
+        
+        # Exact match
+        if name1 == name2:
+            return True
+        
+        # Special case for restaurants with special characters or common words
+        # Split into words and check word similarity
+        words1 = set(name1.split())
+        words2 = set(name2.split())
+        
+        # Very common words in restaurant names that shouldn't determine a match by themselves
+        common_words = {'the', 'restaurant', 'café', 'cafe', 'bar', 'grill', 'bistro', 'kitchen'}
+        
+        # Remove common words for comparison
+        filtered_words1 = words1 - common_words
+        filtered_words2 = words2 - common_words
+        
+        # Check if one is a subset of the other, but only if they share substantial words
+        # This prevents "Parigi" from matching with "Bistrot Parigi"
+        if filtered_words1 and filtered_words2:
+            shared_words = filtered_words1.intersection(filtered_words2)
+            # Only consider a match if they share significant unique words AND
+            # the length difference isn't too great (to avoid matching distinct places like "Parigi" vs "Bistrot Parigi")
+            if len(shared_words) >= min(len(filtered_words1), len(filtered_words2)) * 0.8:
+                # Additional length check to distinguish "Parigi" from "Bistrot Parigi"
+                shorter = name1 if len(name1) < len(name2) else name2
+                longer = name2 if len(name1) < len(name2) else name1
+                
+                # If the longer name is significantly longer, it's probably a different restaurant
+                # Unless the shorter name is fully contained as a distinct word in the longer name
+                if len(longer) > len(shorter) * 1.5:
+                    # Check if shorter name appears as a complete word in longer name
+                    longer_words = longer.split()
+                    # Not a match if shorter name is just one word in a multi-word longer name
+                    if shorter in longer_words and len(longer_words) > 1:
+                        return False
+                    
+                return True
+        
+        return False
+
+class ConciergeParser:
+    def __init__(self):
+        self.conversations = []
+        self.current_conversation = []
+        self.debug_data = []
+        self.persona_analyzer = None
+        
+    def load_personas(self, csv_path):
+        """Load personas from CSV file"""
+        self.persona_analyzer = PersonaAnalyzer(csv_path)
+        return len(self.persona_analyzer.personas) > 0
+        
+    def parse_whatsapp_chat(self, chat_text):
+        """Parse WhatsApp chat text into structured conversations"""
+        # Reset data
+        self.conversations = []
+        self.current_conversation = []
+        self.debug_data = []
+        
+        logger.info(f"Starting to parse chat data of length {len(chat_text)}")
+        
+        try:
+            # Regular expression to match WhatsApp message format
+            message_pattern = r'\[(.*?)\] (.*?): (.*?)(?=\[\d{4}-\d{2}-\d{2}|$)'
+            
+            # Find all messages
+            messages = re.findall(message_pattern, chat_text, re.DOTALL)
+            logger.info(f"Found {len(messages)} messages in chat")
+            
+            # Process each message
+            conversation_id = 0
+            previous_sender = None
+            
+            for i, (timestamp_str, sender, content) in enumerate(messages):
+                # Parse timestamp
+                timestamp = datetime.strptime(timestamp_str, '%Y-%m-%d, %I:%M:%S %p')
+                
+                # Create message object
+                message = {
+                    'timestamp': timestamp,
+                    'sender': sender,
+                    'content': content.strip(),
+                    'type': self._determine_message_type(content.strip(), sender),
+                    'conversation_id': conversation_id
+                }
+                
+                # Extract debug data if present
+                if message['type'] == 'debug':
+                    debug_info = self._extract_debug_info(content.strip())
+                    if debug_info:
+                        message['debug_info'] = debug_info
+                        self.debug_data.append({
+                            'conversation_id': conversation_id,
+                            'timestamp': timestamp,
+                            'debug_type': debug_info['type'],
+                            'data': debug_info['data']
+                        })
+                
+                # Check if this is a new conversation
+                if sender == 'Wagner' and (previous_sender != 'Wagner' or i == 0):
+                    if i > 0:
+                        self.conversations.append(self.current_conversation)
+                        conversation_id += 1
+                    self.current_conversation = []
+                
+                # Add message to current conversation
+                self.current_conversation.append(message)
+                previous_sender = sender
+            
+            # Add the last conversation
+            if self.current_conversation:
+                self.conversations.append(self.current_conversation)
+                
+            # Perform persona matching if persona data is loaded
+            if self.persona_analyzer:
+                self.analyze_personas()
+                
+            logger.info(f"Parsed {len(self.conversations)} conversations")
+            return self.conversations
+        except Exception as e:
+            logger.error(f"Error parsing chat: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise
+    
+    def _determine_message_type(self, content, sender):
+        """Determine the type of message based on content and sender"""
+        if sender == 'Wagner':
+            return 'user_request'
+        elif 'Please, wait' in content or 'Por favor, aguarde' in content:
+            return 'processing'
+        elif content.startswith('[DEBUG]'):
+            return 'debug'
+        elif '‎audio omitted' in content:
+            return 'audio'
+        else:
+            return 'recommendation'
+    
+    def _extract_debug_info(self, content):
+        """Extract structured information from debug messages"""
+        if '[DEBUG] Metadados relacionados' in content:
+            try:
+                # Extract the metadata list
+                metadata_str = content.replace('[DEBUG] Metadados relacionados ', '')
+                metadata_data = ast.literal_eval(metadata_str)
+                return {
+                    'type': 'metadata',
+                    'data': metadata_data
+                }
+            except:
+                return None
+                
+        elif '[DEBUG] Contexto entendido' in content:
+            try:
+                # Extract the context dictionary
+                context_str = content.replace('[DEBUG] Contexto entendido: ', '')
+                context_data = ast.literal_eval(context_str)
+                return {
+                    'type': 'context',
+                    'data': context_data
+                }
+            except:
+                return None
+                
+        elif '[DEBUG] Restaurantes candidatos' in content:
+            try:
+                # Extract the restaurants dictionary
+                restaurants_str = content.replace('[DEBUG] Restaurantes candidatos: ', '')
+                restaurants_data = ast.literal_eval(restaurants_str)
+                return {
+                    'type': 'candidates',
+                    'data': restaurants_data
+                }
+            except:
+                return None
+        
+        return None
+    
+    def analyze_personas(self):
+        """Match conversations to personas and evaluate recommendations"""
+        if not self.persona_analyzer:
+            logger.warning("No persona data loaded, skipping persona analysis")
+            return
+            
+        for i, conversation in enumerate(self.conversations):
+            # Match the conversation to a persona
+            persona_id = self.persona_analyzer.match_conversation_to_persona(conversation)
+            
+            if persona_id:
+                # Evaluate recommendation accuracy
+                evaluation = self.persona_analyzer.evaluate_recommendations(conversation, persona_id)
+                
+                # Find matching persona info
+                persona_info = next((p for p in self.persona_analyzer.personas if p['id'] == persona_id), None)
+                
+                # Store the persona and evaluation information with the conversation
+                for msg in conversation:
+                    msg['persona_id'] = persona_id
+                    if persona_info:
+                        msg['persona_description'] = persona_info.get('description', '')
+                
+                # Store evaluation with the recommendation message
+                for msg in conversation:
+                    if msg['type'] == 'recommendation':
+                        msg['recommendation_evaluation'] = evaluation
+                        break
+    
+    def get_conversation_metrics(self):
+        """Generate metrics for all conversations"""
+        metrics = []
+        
+        for i, conversation in enumerate(self.conversations):
+            # Extract request
+            user_request = next((msg['content'] for msg in conversation if msg['type'] == 'user_request'), None)
+            
+            # Extract timestamps for different response time calculations
+            request_time = next((msg['timestamp'] for msg in conversation if msg['type'] == 'user_request'), None)
+            first_response_time = next((msg['timestamp'] for msg in conversation 
+                                       if msg['type'] not in ['user_request'] and 
+                                       msg['sender'] != 'Wagner'), None)
+            processing_time = next((msg['timestamp'] for msg in conversation if msg['type'] == 'processing'), None)
+            recommendation_time = next((msg['timestamp'] for msg in conversation if msg['type'] == 'recommendation'), None)
+            last_message_time = conversation[-1]['timestamp'] if conversation else None
+            
+            # Calculate different response time metrics
+            time_to_first_response = None
+            time_to_processing = None
+            time_to_recommendation = None
+            total_conversation_time = None
+            
+            if request_time and first_response_time:
+                time_to_first_response = (first_response_time - request_time).total_seconds()
+                
+            if request_time and processing_time:
+                time_to_processing = (processing_time - request_time).total_seconds()
+                
+            if request_time and recommendation_time:
+                time_to_recommendation = (recommendation_time - request_time).total_seconds()
+                
+            if request_time and last_message_time:
+                total_conversation_time = (last_message_time - request_time).total_seconds()
+            
+            # Count debug messages
+            debug_count = sum(1 for msg in conversation if msg['type'] == 'debug')
+            
+            # Extract metadata count if available
+            metadata_count = 0
+            context_keys = []
+            for msg in conversation:
+                if msg['type'] == 'debug' and 'debug_info' in msg:
+                    if msg['debug_info']['type'] == 'metadata':
+                        metadata_count = len(msg['debug_info']['data'])
+                    elif msg['debug_info']['type'] == 'context':
+                        if 'results' in msg['debug_info']['data']:
+                            context_keys = list(msg['debug_info']['data']['results'].keys())
+            
+            # Add persona information if available
+            persona_id = next((msg.get('persona_id') for msg in conversation if 'persona_id' in msg), None)
+            persona_description = next((msg.get('persona_description') for msg in conversation if 'persona_description' in msg), None)
+            
+            # Add recommendation evaluation if available
+            recommendation_accuracy = None
+            for msg in conversation:
+                if msg['type'] == 'recommendation' and 'recommendation_evaluation' in msg:
+                    evaluation = msg['recommendation_evaluation']
+                    recommendation_accuracy = evaluation.get('accuracy')
+                    break
+            
+            metrics_item = {
+                'conversation_id': i,
+                'request': user_request,
+                'time_to_first_response': time_to_first_response,
+                'time_to_processing': time_to_processing,
+                'time_to_recommendation': time_to_recommendation,
+                'total_conversation_time': total_conversation_time,
+                'debug_count': debug_count,
+                'metadata_count': metadata_count,
+                'context_keys': context_keys
+            }
+            
+            # Add persona information if available
+            if persona_id:
+                metrics_item['persona_id'] = persona_id
+                metrics_item['persona_description'] = persona_description
+                
+            # Add recommendation accuracy if available
+            if recommendation_accuracy is not None:
+                metrics_item['recommendation_accuracy'] = recommendation_accuracy
+            
+            metrics.append(metrics_item)
+        
+        return metrics
+    
+    def extract_restaurant_recommendations(self):
+        """Extract restaurant recommendations from all conversations"""
+        recommendations = []
+        
+        for i, conversation in enumerate(self.conversations):
+            # Get user request
+            user_request = next((msg['content'] for msg in conversation if msg['type'] == 'user_request'), "No request")
+            
+            # Get recommendation content
+            recommendation_msg = next((msg for msg in conversation if msg['type'] == 'recommendation'), None)
+            
+            if recommendation_msg:
+                # Extract restaurant names (this is a simple extraction; might need refinement)
+                content = recommendation_msg['content']
+                # Look for restaurant names that are typically followed by a dash or hyphen
+                restaurant_pattern = r'[-–]\s*(.*?)(?=\s*[-–]|\n|$)'
+                potential_restaurants = re.findall(r'- ([^:]+?)(?=\s*–|\s*-|\s*\n|$)', content)
+                
+                # Add candidate restaurants from debug data if available
+                candidate_restaurants = []
+                for msg in conversation:
+                    if msg['type'] == 'debug' and 'debug_info' in msg:
+                        if msg['debug_info']['type'] == 'candidates' and 'results' in msg['debug_info']['data']:
+                            for key, values in msg['debug_info']['data']['results'].items():
+                                if isinstance(values, list):
+                                    for value in values:
+                                        if ' -> ' in value:
+                                            parts = value.split(' -> ')
+                                            if len(parts) > 1:
+                                                candidate_restaurants.append((key, parts[1]))
+                
+                # Get persona information if available
+                persona_id = next((msg.get('persona_id') for msg in conversation if 'persona_id' in msg), None)
+                persona_description = next((msg.get('persona_description') for msg in conversation if 'persona_description' in msg), None)
+                
+                # Get recommendation evaluation if available
+                evaluation = recommendation_msg.get('recommendation_evaluation', {})
+                expected_recommendations = evaluation.get('expected_recommendations', [])
+                accuracy = evaluation.get('accuracy', None)
+                
+                recommendation_item = {
+                    'conversation_id': i,
+                    'request': user_request,
+                    'potential_restaurants': potential_restaurants,
+                    'candidate_restaurants': candidate_restaurants,
+                    'full_recommendation': content
+                }
+                
+                # Add persona information if available
+                if persona_id:
+                    recommendation_item['persona_id'] = persona_id
+                    recommendation_item['persona_description'] = persona_description
+                    
+                # Add recommendation evaluation if available
+                if evaluation:
+                    recommendation_item['expected_restaurants'] = expected_recommendations
+                    recommendation_item['accuracy'] = accuracy
+                
+                recommendations.append(recommendation_item)
+        
+        return recommendations
+
+    def generate_metadata_network(self):
+        """Generate network graph data from metadata relationships"""
+        G = nx.Graph()
+        
+        # Process all debug metadata
+        for debug in self.debug_data:
+            if debug['debug_type'] == 'metadata':
+                for item in debug['data']:
+                    if ' -> ' in item:
+                        category, value = item.split(' -> ')
+                        G.add_node(category, type='category')
+                        G.add_node(value, type='value')
+                        G.add_edge(category, value)
+        
+        # Convert to format suitable for visualization
+        nodes = [{'id': node, 'type': G.nodes[node]['type']} for node in G.nodes()]
+        edges = [{'source': u, 'target': v} for u, v in G.edges()]
+        
+        return {'nodes': nodes, 'edges': edges}
+    
+    def get_persona_analysis_summary(self):
+        """Generate summary statistics for persona analysis"""
+        if not self.persona_analyzer:
+            return {
+                'persona_count': 0,
+                'matched_conversations': 0,
+                'avg_accuracy': 0,
+                'avg_precision': 0,
+                'avg_recall': 0,
+                'accuracy_distribution': {},
+                'recommendation_counts': {}
+            }
+            
+        # Count matched conversations
+        matched_conversations = 0
+        accuracies = []
+        precisions = []
+        recalls = []
+        recommendation_counts = defaultdict(int)
+        
+        for conversation in self.conversations:
+            has_persona = any('persona_id' in msg for msg in conversation)
+            if has_persona:
+                matched_conversations += 1
+                
+                # Get accuracy if available
+                for msg in conversation:
+                    if msg['type'] == 'recommendation' and 'recommendation_evaluation' in msg:
+                        eval_data = msg['recommendation_evaluation']
+                        
+                        # Add metrics
+                        if 'accuracy' in eval_data:
+                            accuracies.append(eval_data['accuracy'])
+                        if 'precision' in eval_data:
+                            precisions.append(eval_data['precision'])
+                        if 'recall' in eval_data:
+                            recalls.append(eval_data['recall'])
+                        
+                        # Count number of recommendations
+                        actual_count = len(eval_data.get('actual_recommendations', []))
+                        recommendation_counts[actual_count] += 1
+        
+        # Calculate averages
+        avg_accuracy = sum(accuracies) / len(accuracies) if accuracies else 0
+        avg_precision = sum(precisions) / len(precisions) if precisions else 0
+        avg_recall = sum(recalls) / len(recalls) if recalls else 0
+        
+        # Create accuracy distribution
+        accuracy_distribution = {
+            '0-25%': len([a for a in accuracies if a <= 0.25]),
+            '26-50%': len([a for a in accuracies if 0.25 < a <= 0.5]),
+            '51-75%': len([a for a in accuracies if 0.5 < a <= 0.75]),
+            '76-100%': len([a for a in accuracies if a > 0.75])
+        }
+        
+        return {
+            'persona_count': len(self.persona_analyzer.personas),
+            'matched_conversations': matched_conversations,
+            'avg_accuracy': avg_accuracy,
+            'avg_precision': avg_precision,
+            'avg_recall': avg_recall,
+            'accuracy_distribution': accuracy_distribution,
+            'recommendation_counts': dict(recommendation_counts)
+        }
+
+# Flask web application
+app = Flask(__name__)
+# Configure CORS to allow requests from the frontend
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
+parser = ConciergeParser()
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# Add a simple test route to verify the server is running
+@app.route('/test', methods=['GET'])
+def test():
+    return jsonify({"status": "ok", "message": "Flask server is running"})
+
+@app.route('/upload', methods=['POST'])
+def upload_chat():
+    logger.info("Received upload request")
+    
+    if 'chat_file' not in request.files:
+        logger.warning("No file uploaded in request")
+        return jsonify({'error': 'No file uploaded'}), 400
+    
+    file = request.files['chat_file']
+    
+    if file.filename == '':
+        logger.warning("Empty filename in uploaded file")
+        return jsonify({'error': 'Empty filename'}), 400
+    
+    try:
+        logger.info(f"Processing uploaded file: {file.filename}")
+        chat_text = file.read().decode('utf-8')
+        logger.info(f"File decoded successfully, length: {len(chat_text)}")
+        
+        # Load persona data if not already loaded
+        if not parser.persona_analyzer:
+            # Updated path to use the file in the project root
+            persona_csv_path = os.path.join(os.path.dirname(__file__), "Concierge - Personas.csv")
+            parser.load_personas(persona_csv_path)
+        
+        conversations = parser.parse_whatsapp_chat(chat_text)
+        logger.info(f"Parsed {len(conversations)} conversations")
+        
+        metrics = parser.get_conversation_metrics()
+        logger.info(f"Generated metrics for {len(metrics)} conversations")
+        
+        recommendations = parser.extract_restaurant_recommendations()
+        logger.info(f"Extracted {len(recommendations)} recommendations")
+        
+        network_data = parser.generate_metadata_network()
+        logger.info(f"Generated network with {len(network_data.get('nodes', []))} nodes and {len(network_data.get('edges', []))} edges")
+        
+        # Get persona analysis summary
+        persona_summary = parser.get_persona_analysis_summary()
+        logger.info(f"Generated persona analysis summary with {persona_summary.get('persona_count', 0)} personas")
+        
+        response_data = {
+            'conversation_count': len(conversations),
+            'metrics': metrics,
+            'recommendations': recommendations,
+            'network': network_data,
+            'persona_summary': persona_summary
+        }
+        
+        # Verify the response can be serialized to JSON
+        json_response = json.dumps(response_data)
+        logger.info(f"Response JSON created successfully, length: {len(json_response)}")
+        
+        return jsonify(response_data)
+    except Exception as e:
+        logger.error(f"Error processing upload: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({'error': f"Server error: {str(e)}"}), 500
+
+@app.route('/conversation/<int:conversation_id>')
+def get_conversation(conversation_id):
+    try:
+        if conversation_id < 0 or conversation_id >= len(parser.conversations):
+            logger.warning(f"Invalid conversation ID requested: {conversation_id}")
+            return jsonify({'error': 'Invalid conversation ID'}), 404
+        
+        # Convert complex objects like datetime to string for JSON serialization
+        conversation_data = []
+        for msg in parser.conversations[conversation_id]:
+            msg_copy = msg.copy()
+            if 'timestamp' in msg_copy:
+                msg_copy['timestamp'] = msg_copy['timestamp'].isoformat()
+            conversation_data.append(msg_copy)
+        
+        return jsonify(conversation_data)
+    except Exception as e:
+        logger.error(f"Error getting conversation: {str(e)}")
+        return jsonify({'error': f"Server error: {str(e)}"}), 500
+
+@app.route('/metrics')
+def get_metrics():
+    try:
+        return jsonify(parser.get_conversation_metrics())
+    except Exception as e:
+        logger.error(f"Error getting metrics: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/recommendations')
+def get_recommendations():
+    try:
+        return jsonify(parser.extract_restaurant_recommendations())
+    except Exception as e:
+        logger.error(f"Error getting recommendations: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/network')
+def get_network():
+    try:
+        return jsonify(parser.generate_metadata_network())
+    except Exception as e:
+        logger.error(f"Error generating network: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/personas')
+def get_personas():
+    try:
+        if not parser.persona_analyzer:
+            # Updated path to use the file in the project root
+            persona_csv_path = os.path.join(os.path.dirname(__file__), "Concierge - Personas.csv")
+            parser.load_personas(persona_csv_path)
+            
+        return jsonify(parser.persona_analyzer.personas)
+    except Exception as e:
+        logger.error(f"Error getting personas: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/persona_summary')
+def get_persona_summary():
+    try:
+        return jsonify(parser.get_persona_analysis_summary())
+    except Exception as e:
+        logger.error(f"Error getting persona summary: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == "__main__":
+    # Make sure to run the Flask app on the correct host and port 
+    # and in debug mode for development
+    logger.info("Starting Flask server on http://localhost:5000")
+    app.run(host='0.0.0.0', port=5000, debug=True)
