@@ -253,11 +253,10 @@ function initializeDebugInsightsSection() {
     }
 }
 
-// File upload UI handling
+// File upload UI handling with automatic submission
 function initializeFileUploadUI() {
     const uploadArea = document.getElementById('upload-area');
     const fileInput = document.getElementById('chat-file');
-    const browseButton = document.getElementById('browse-button');
     const selectedFileEl = document.getElementById('selected-file');
     const uploadPlaceholder = document.querySelector('.upload-placeholder');
     const fileNameEl = document.querySelector('.file-name');
@@ -265,16 +264,7 @@ function initializeFileUploadUI() {
     
     if (!uploadArea || !fileInput) return;
     
-    // Handle browse button click
-    if (browseButton) {
-        browseButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            fileInput.click();
-        });
-    }
-    
-    // Handle file selection with validation
+    // Handle file selection with validation and auto-submission
     fileInput.addEventListener('change', function() {
         if (this.files.length > 0) {
             const file = this.files[0];
@@ -296,6 +286,14 @@ function initializeFileUploadUI() {
             
             // Show selected file info
             showSelectedFile(file.name);
+            
+            // Auto-submit the form after a short delay to allow UI feedback
+            setTimeout(() => {
+                const submitBtn = document.getElementById('hidden-submit-btn');
+                if (submitBtn) {
+                    submitBtn.click();
+                }
+            }, 300);
         }
     });
     
@@ -335,6 +333,14 @@ function initializeFileUploadUI() {
             
             // Show selected file info
             showSelectedFile(file.name);
+            
+            // Auto-submit the form after a short delay
+            setTimeout(() => {
+                const submitBtn = document.getElementById('hidden-submit-btn');
+                if (submitBtn) {
+                    submitBtn.click();
+                }
+            }, 300);
         }
     });
     
@@ -356,6 +362,7 @@ function initializeFileUploadUI() {
     function showSelectedFile(fileName) {
         if (fileNameEl) {
             fileNameEl.textContent = fileName;
+            fileNameEl.title = fileName; // Add tooltip for full filename on hover
         }
         
         selectedFileEl.classList.remove('d-none');

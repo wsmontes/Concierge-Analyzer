@@ -31,6 +31,9 @@
                 </button>
             </div>
             
+            <!-- Include the upload form in the sidebar -->
+            {% include 'partials/upload-form.html' %}
+            
             <ul class="sidebar-menu">
                 <li class="menu-header">ANALYTICS</li>
                 <li class="menu-item active" data-target="dashboard-section">
@@ -85,9 +88,6 @@
             
             <!-- Content Container -->
             <div class="content-container">
-                <!-- Upload Form -->
-                {% include 'partials/upload-form.html' %}
-                
                 <!-- Loading Indicator -->
                 <div id="loading" class="loading-overlay d-none">
                     <div class="loading-content">

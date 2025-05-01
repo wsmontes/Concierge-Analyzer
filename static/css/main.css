@@ -676,6 +676,180 @@ body {
     font-size: 0.85rem;
 }
 
+/* Sidebar Upload Form Styles */
+.sidebar-upload-section {
+    padding: 0 15px;
+    margin-bottom: 20px;
+}
+
+.sidebar-card {
+    background-color: var(--card-bg);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+}
+
+.sidebar-card-header {
+    padding: 10px 15px;
+    background-color: rgba(var(--bs-primary-rgb), 0.05);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-card-header h5 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sidebar-card-body {
+    padding: 12px;
+}
+
+.compact-upload-area {
+    position: relative;
+    min-height: 100px;
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    padding: 8px;
+}
+
+.compact-upload-area.dragover {
+    border-color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.05);
+}
+
+.compact-upload-area .upload-placeholder {
+    text-align: center;
+}
+
+.compact-upload-area .upload-placeholder i {
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+}
+
+.compact-upload-area .upload-placeholder p {
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+}
+
+.compact-upload-area .file-input {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.sidebar-upload-section .selected-file {
+    display: flex;
+    align-items: center;
+    background-color: var(--body-bg);
+    padding: 8px;
+    border-radius: 6px;
+    position: relative;
+}
+
+.sidebar-upload-section .selected-file i {
+    font-size: 1rem;
+    color: var(--bs-primary);
+    margin-right: 8px;
+}
+
+.sidebar-upload-section .selected-file .file-name {
+    flex-grow: 1;
+    margin: 0;
+    max-width: 150px;
+}
+
+.sidebar-upload-section .form-text.x-small {
+    font-size: 0.7rem;
+}
+
+/* Simple Drop Area - Minimalist Styling */
+.simple-drop-container {
+    padding: 10px 15px;
+    margin-bottom: 15px;
+}
+
+.simple-drop-area {
+    position: relative;
+    min-height: 80px;
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    padding: 12px;
+    background-color: var(--body-bg);
+}
+
+.simple-drop-area:hover,
+.simple-drop-area.dragover {
+    border-color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.05);
+}
+
+.simple-drop-area .upload-placeholder {
+    text-align: center;
+}
+
+.simple-drop-area .upload-placeholder i {
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+}
+
+.simple-drop-area .micro-text {
+    font-size: 0.7rem;
+    margin: 0 0 5px 0;
+    color: var(--text-secondary);
+}
+
+.simple-drop-area .file-input {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.simple-drop-area .selected-file {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 8px;
+    border-radius: 4px;
+    background-color: rgba(var(--bs-success-rgb), 0.05);
+    border: 1px solid rgba(var(--bs-success-rgb), 0.2);
+}
+
+.simple-drop-area .selected-file i {
+    font-size: 0.9rem;
+    color: var(--bs-success);
+    margin-right: 8px;
+}
+
+.simple-drop-area .selected-file .file-name {
+    flex-grow: 1;
+    margin: 0;
+    color: var(--text-primary);
+}
+
 /* Responsive Layout */
 @media (max-width: 992px) {
     .sidebar {

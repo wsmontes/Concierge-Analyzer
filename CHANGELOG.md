@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+- Simplified the upload form to a minimalist drop area with automatic submission
+- Removed unnecessary panels, cards, and buttons while maintaining full functionality
+- Added automatic file upload when a valid file is selected or dropped
+- Improved user experience by eliminating the need for explicit submission
+
 ### Fixed
 - Fixed responsive layout issues with the conversation table by:
   - Removing conflicting CSS Grid layout that was fighting with Bootstrap's grid
