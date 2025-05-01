@@ -649,6 +649,12 @@ CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
 parser = ConciergeParser()
 
+# Import the DebugAnalyzer class at the top of the file
+from debug_analyzer import DebugAnalyzer
+
+# Initialize a debug analyzer instance right after the parser initialization
+debug_analyzer = DebugAnalyzer()
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -793,6 +799,49 @@ def get_persona_summary():
         return jsonify(parser.get_persona_analysis_summary())
     except Exception as e:
         logger.error(f"Error getting persona summary: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# Add these routes after the existing routes
+
+@app.route('/debug_analysis')
+def get_debug_analysis():
+    """Get comprehensive debug data analysis."""
+    try:
+        # Make sure the debug analyzer has the latest conversations
+        debug_analyzer.load_conversations(parser.conversations)
+        
+        # Generate global insights
+        global_insights = debug_analyzer.generate_global_insights()
+        
+        # Get network data
+        network_data = debug_analyzer.generate_network_data()
+        
+        # Get cross-recommendation insights
+        cross_insights = debug_analyzer.get_cross_recommendations_insights()
+        
+        return jsonify({
+            'global_insights': global_insights,
+            'network_data': network_data,
+            'cross_insights': cross_insights
+        })
+    except Exception as e:
+        logger.error(f"Error generating debug analysis: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/debug_analysis/<int:conversation_id>')
+def get_conversation_debug_analysis(conversation_id):
+    """Get debug analysis for a specific conversation."""
+    try:
+        # Make sure the debug analyzer has the latest conversations
+        debug_analyzer.load_conversations(parser.conversations)
+        
+        # Get analysis for the specified conversation
+        analysis = debug_analyzer.analyze_conversation_debug(conversation_id)
+        return jsonify(analysis)
+    except Exception as e:
+        logger.error(f"Error generating conversation debug analysis: {str(e)}")
+        logger.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
