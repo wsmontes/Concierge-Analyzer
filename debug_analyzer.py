@@ -1,7 +1,7 @@
 """
 Debug Analyzer Module
-Purpose: Extract advanced insights from conversation debug data
-Dependencies: pandas, numpy, networkx, collections, logging
+Purpose: Extract advanced insights from conversation debug data and provide visualization data
+Dependencies: pandas, numpy, networkx, collections, logging, re
 """
 
 import pandas as pd
@@ -10,6 +10,7 @@ from collections import defaultdict, Counter
 import networkx as nx
 import logging
 import traceback
+import re
 from typing import List, Dict, Any, Optional, Tuple, Union
 import matplotlib.pyplot as plt
 from io import BytesIO
@@ -34,12 +35,15 @@ class DebugAnalyzer:
         self.restaurant_counts = Counter()
         self.category_concept_map = defaultdict(list)
         self.conversation_concepts = defaultdict(list)
+        self.category_restaurant_map = defaultdict(Counter)
+        self.concept_restaurant_map = defaultdict(Counter)
         
     def load_conversations(self, conversations):
         """Load conversations for analysis."""
         self.conversations = conversations
         self.extract_debug_data()
         self.build_networks()
+        self.analyze_recommendations()
         logger.info(f"Loaded {len(self.conversations)} conversations with {len(self.debug_messages)} debug messages")
         
     def extract_debug_data(self):
@@ -80,54 +84,140 @@ class DebugAnalyzer:
             if debug['type'] == 'metadata' and 'data' in debug:
                 conv_id = debug['conversation_id']
                 
-                for item in debug['data']:
-                    if ' -> ' in item:
-                        category, value = item.split(' -> ')
-                        
-                        # Add to category counts
-                        self.category_counts[category] += 1
-                        
-                        # Add to concept counts
-                        self.concept_counts[value] += 1
-                        
-                        # Add to category-concept map
-                        if value not in self.category_concept_map[category]:
-                            self.category_concept_map[category].append(value)
-                        
-                        # Add to conversation-concept map
-                        self.conversation_concepts[conv_id].append((category, value))
-                        
-                        # Add to network
-                        self.concept_network.add_node(category, type='category')
-                        self.concept_network.add_node(value, type='concept')
-                        self.concept_network.add_edge(category, value)
+                # Check if data is a list
+                if isinstance(debug['data'], list):
+                    for item in debug['data']:
+                        # Check different possible formats for category -> concept relationships
+                        if isinstance(item, str) and ' -> ' in item:
+                            category, value = item.split(' -> ')
+                            self._add_concept_relation(category, value, conv_id)
+                        elif isinstance(item, dict) and 'category' in item and 'value' in item:
+                            category, value = item['category'], item['value']
+                            self._add_concept_relation(category, value, conv_id)
+                # Check if data is structured with categories as keys
+                elif isinstance(debug['data'], dict):
+                    for category, values in debug['data'].items():
+                        if isinstance(values, list):
+                            for value in values:
+                                if isinstance(value, str):
+                                    self._add_concept_relation(category, value, conv_id)
+                                elif isinstance(value, dict) and 'value' in value:
+                                    self._add_concept_relation(category, value['value'], conv_id)
             
             # Process restaurant candidates (third debug messages)
             elif debug['type'] == 'candidates' and 'data' in debug:
-                if 'results' in debug['data']:
+                if isinstance(debug['data'], dict) and 'results' in debug['data']:
                     for category, restaurants in debug['data']['results'].items():
                         if isinstance(restaurants, list):
                             # Add category as a node
                             self.restaurant_network.add_node(category, type='category')
                             
                             # Process restaurants
-                            for restaurant_entry in restaurants:
-                                if ' -> ' in restaurant_entry:
-                                    score, restaurant = restaurant_entry.split(' -> ')
-                                    
-                                    # Extract just the score number
+                            for restaurant_item in restaurants:
+                                restaurant = None
+                                score = 0.0
+                                
+                                # Handle different formats for restaurant entries
+                                if isinstance(restaurant_item, str) and ' -> ' in restaurant_item:
+                                    score_str, restaurant = restaurant_item.split(' -> ')
                                     try:
-                                        score = float(score.strip())
+                                        score = float(score_str.strip())
                                     except ValueError:
                                         score = 0.0
-                                    
+                                elif isinstance(restaurant_item, dict) and 'name' in restaurant_item:
+                                    restaurant = restaurant_item['name']
+                                    score = restaurant_item.get('score', 0.0)
+                                
+                                if restaurant:
                                     # Add restaurant to counts
                                     self.restaurant_counts[restaurant] += 1
                                     
                                     # Add to network
                                     self.restaurant_network.add_node(restaurant, type='restaurant')
                                     self.restaurant_network.add_edge(category, restaurant, weight=score)
-                                    
+
+    def _add_concept_relation(self, category, value, conv_id):
+        """Helper method to add a category-concept relationship."""
+        # Standardize category names - some might have case variations
+        category = category.strip()
+        value = value.strip()
+        
+        # Add to category counts
+        self.category_counts[category] += 1
+        
+        # Add to concept counts
+        self.concept_counts[value] += 1
+        
+        # Add to category-concept map
+        if value not in self.category_concept_map[category]:
+            self.category_concept_map[category].append(value)
+        
+        # Add to conversation-concept map
+        self.conversation_concepts[conv_id].append((category, value))
+        
+        # Add to network
+        self.concept_network.add_node(category, type='category')
+        self.concept_network.add_node(value, type='concept')
+        self.concept_network.add_edge(category, value)
+                    
+    def analyze_recommendations(self):
+        """Analyze recommendations to map concepts and categories to restaurants."""
+        self.category_restaurant_map = defaultdict(Counter)
+        self.concept_restaurant_map = defaultdict(Counter)
+        
+        for conv_id in range(len(self.conversations)):
+            # Get concepts for this conversation
+            concept_list = self.conversation_concepts.get(conv_id, [])
+            
+            # Skip if no concepts were found
+            if not concept_list:
+                continue
+                
+            # Get restaurant recommendations for this conversation
+            recommended_restaurants = self._extract_recommended_restaurants(conv_id)
+            
+            # Link concepts to restaurants
+            for category, concept in concept_list:
+                for restaurant in recommended_restaurants:
+                    self.concept_restaurant_map[(category, concept)][restaurant] += 1
+                    self.category_restaurant_map[category][restaurant] += 1
+    
+    def _extract_recommended_restaurants(self, conv_id):
+        """Extract restaurant names from recommendation messages using improved patterns."""
+        recommended_restaurants = []
+        conversation = self.conversations[conv_id] if conv_id < len(self.conversations) else []
+        
+        for msg in conversation:
+            if msg['type'] == 'recommendation':
+                content = msg['content']
+                
+                # Try several patterns to catch different recommendation formats
+                patterns = [
+                    r'[-•*] ([^:]+?)(?=\s*–|\s*-|\s*\n|$)',  # Bullet points with hyphens
+                    r'(\d+\.\s*)([^:]+?)(?=\s*–|\s*-|\s*\n|$)',  # Numbered lists
+                    r'"([^"]+)"',  # Quoted restaurant names
+                    r'(?:recommend|try|visit|suggest)[^\n.]*?(?:called|named)?\s+([A-Z][^.,\n]*)'  # Descriptive recommendations
+                ]
+                
+                extracted = []
+                for pattern in patterns:
+                    found = re.findall(pattern, content)
+                    if found:
+                        if isinstance(found[0], tuple):  # For numbered lists
+                            found = [match[1] if len(match) > 1 else match[0] for match in found]
+                        extracted.extend(found)
+                
+                if extracted:
+                    # Clean up extracted names
+                    recommended_restaurants = [
+                        rest.strip().rstrip('.,:;')
+                        for rest in extracted 
+                        if len(rest.strip()) > 1  # Filter out very short matches
+                    ]
+                    break
+        
+        return recommended_restaurants
+        
     def get_conversation_debug_sequence(self, conversation_id):
         """Get the full debug sequence for a specific conversation."""
         conv_debug = [d for d in self.debug_messages if d['conversation_id'] == conversation_id]
@@ -150,47 +240,76 @@ class DebugAnalyzer:
             if debug_type == 'metadata':
                 # Extract concepts from metadata
                 concepts = []
-                for item in debug.get('data', []):
-                    if ' -> ' in item:
-                        category, value = item.split(' -> ')
-                        concepts.append({
-                            'category': category,
-                            'value': value
-                        })
-                    else:
-                        concepts.append({
-                            'category': 'uncategorized',
-                            'value': item
-                        })
+                if isinstance(debug.get('data', []), list):
+                    for item in debug['data']:
+                        if isinstance(item, str) and ' -> ' in item:
+                            category, value = item.split(' -> ')
+                            concepts.append({
+                                'category': category.strip(),
+                                'value': value.strip()
+                            })
+                        elif isinstance(item, dict) and 'category' in item and 'value' in item:
+                            concepts.append({
+                                'category': item['category'].strip(),
+                                'value': item['value'].strip()
+                            })
+                        else:
+                            concepts.append({
+                                'category': 'uncategorized',
+                                'value': str(item).strip()
+                            })
+                elif isinstance(debug.get('data', {}), dict):
+                    for category, values in debug['data'].items():
+                        if isinstance(values, list):
+                            for value in values:
+                                if isinstance(value, str):
+                                    concepts.append({
+                                        'category': category.strip(),
+                                        'value': value.strip()
+                                    })
+                                elif isinstance(value, dict) and 'value' in value:
+                                    concepts.append({
+                                        'category': category.strip(),
+                                        'value': value['value'].strip()
+                                    })
+                
                 concepts_evolution['metadata'] = concepts
                 
             elif debug_type == 'context':
                 # Extract context information
-                if 'results' in debug.get('data', {}):
+                if isinstance(debug.get('data', {}), dict) and 'results' in debug['data']:
                     context_data = debug['data']['results']
                     concepts_evolution['context'] = context_data
                     
             elif debug_type == 'candidates':
                 # Extract candidate restaurants
                 candidates = []
-                if 'results' in debug.get('data', {}):
+                if isinstance(debug.get('data', {}), dict) and 'results' in debug['data']:
                     for category, restaurants in debug['data']['results'].items():
                         category_candidates = []
                         if isinstance(restaurants, list):
-                            for restaurant_entry in restaurants:
-                                if ' -> ' in restaurant_entry:
-                                    score_str, name = restaurant_entry.split(' -> ')
+                            for restaurant_item in restaurants:
+                                name = None
+                                score = 0.0
+                                
+                                if isinstance(restaurant_item, str) and ' -> ' in restaurant_item:
+                                    score_str, name = restaurant_item.split(' -> ')
                                     try:
                                         score = float(score_str.strip())
                                     except ValueError:
                                         score = 0.0
+                                elif isinstance(restaurant_item, dict) and 'name' in restaurant_item:
+                                    name = restaurant_item['name']
+                                    score = restaurant_item.get('score', 0.0)
+                                    
+                                if name:
                                     category_candidates.append({
-                                        'name': name,
+                                        'name': name.strip(),
                                         'score': score
                                     })
                         
                         candidates.append({
-                            'category': category,
+                            'category': category.strip(),
                             'restaurants': category_candidates
                         })
                 concepts_evolution['candidates'] = candidates
@@ -372,7 +491,11 @@ class DebugAnalyzer:
                 'debug_message_count': len(self.debug_messages),
                 'unique_categories': len(self.category_counts),
                 'unique_concepts': len(self.concept_counts),
-                'unique_restaurants': len(self.restaurant_counts)
+                'unique_restaurants': len(self.restaurant_counts),
+                'category_count': sum(self.category_counts.values()),
+                'concept_count': sum(self.concept_counts.values()),
+                'restaurant_count': sum(self.restaurant_counts.values()),
+                'association_count': sum(len(assocs) for assocs in self.category_restaurant_map.values())
             }
         })
         
@@ -522,57 +645,40 @@ class DebugAnalyzer:
     
     def get_cross_recommendations_insights(self):
         """Analyze which concepts lead to which restaurant recommendations."""
-        # Map concepts to restaurant recommendations
-        concept_to_restaurants = defaultdict(Counter)
-        category_to_restaurants = defaultdict(Counter)
+        # Create the insights object
+        insights = {
+            'concept_restaurant_associations': [],
+            'category_restaurant_associations': []
+        }
         
-        for conv_id in range(len(self.conversations)):
-            # Get concepts for this conversation
-            concept_list = self.conversation_concepts.get(conv_id, [])
-            
-            # Get restaurant recommendations for this conversation
-            recommended_restaurants = []
-            for msg in self.conversations[conv_id]:
-                if msg['type'] == 'recommendation':
-                    # Extract restaurant names using regex
-                    import re
-                    restaurant_pattern = r'- ([^:]+?)(?=\s*–|\s*-|\s*\n|$)'
-                    extracted = re.findall(restaurant_pattern, msg['content'])
-                    recommended_restaurants = [rest.strip() for rest in extracted]
-                    break
-            
-            # Link concepts to restaurants
-            for category, concept in concept_list:
-                for restaurant in recommended_restaurants:
-                    concept_to_restaurants[(category, concept)][restaurant] += 1
-                    category_to_restaurants[category][restaurant] += 1
-        
-        # Find strongest associations
+        # Find strongest concept-restaurant associations
         concept_restaurant_associations = []
-        for (category, concept), restaurants in concept_to_restaurants.items():
+        for (category, concept), restaurants in self.concept_restaurant_map.items():
             if restaurants:
                 top_restaurant, count = restaurants.most_common(1)[0]
-                concept_restaurant_associations.append({
-                    'category': category,
-                    'concept': concept,
-                    'restaurant': top_restaurant,
-                    'count': count
-                })
+                if count > 0:  # Only include if there's at least one occurrence
+                    concept_restaurant_associations.append({
+                        'category': category,
+                        'concept': concept,
+                        'restaurant': top_restaurant,
+                        'count': count
+                    })
         
         # Sort by count
         concept_restaurant_associations.sort(key=lambda x: x['count'], reverse=True)
+        insights['concept_restaurant_associations'] = concept_restaurant_associations[:20]  # Top 20
         
         # Find top restaurants by category
         category_restaurant_associations = []
-        for category, restaurants in category_to_restaurants.items():
+        for category, restaurants in self.category_restaurant_map.items():
             if restaurants:
                 top_3 = restaurants.most_common(3)
-                category_restaurant_associations.append({
-                    'category': category,
-                    'top_restaurants': [{'name': r, 'count': c} for r, c in top_3]
-                })
+                if top_3:  # Only include if we have results
+                    category_restaurant_associations.append({
+                        'category': category,
+                        'top_restaurants': [{'name': r, 'count': c} for r, c in top_3]
+                    })
         
-        return {
-            'concept_restaurant_associations': concept_restaurant_associations[:20],  # Top 20
-            'category_restaurant_associations': category_restaurant_associations
-        }
+        insights['category_restaurant_associations'] = category_restaurant_associations
+        
+        return insights
