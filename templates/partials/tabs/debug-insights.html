@@ -39,7 +39,36 @@
                                     <i class="bi bi-search"></i>
                                 </button>
                             </div>
-                            <div class="list-group list-group-flush" id="debug-conversation-list" style="max-height: 700px; overflow-y: auto;">
+                            <!-- Summary Stats for Quick Overview -->
+                            <div class="debug-stats p-2 bg-light border-bottom">
+                                <div class="row g-2 text-center">
+                                    <div class="col-6">
+                                        <div class="p-1 border rounded">
+                                            <small class="d-block text-muted">Concepts</small>
+                                            <strong id="debug-concept-count">0</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="p-1 border rounded">
+                                            <small class="d-block text-muted">Categories</small>
+                                            <strong id="debug-category-count">0</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="p-1 border rounded">
+                                            <small class="d-block text-muted">Restaurants</small>
+                                            <strong id="debug-restaurant-count">0</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="p-1 border rounded">
+                                            <small class="d-block text-muted">Associations</small>
+                                            <strong id="debug-association-count">0</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="list-group list-group-flush" id="debug-conversation-list" style="max-height: 600px; overflow-y: auto;">
                                 <!-- Conversations will be added here by JS -->
                             </div>
                         </div>
@@ -50,7 +79,240 @@
                 <div class="debug-content" style="min-height: 800px;">
                     <!-- Conversation Details Panel (hidden by default) -->
                     <div class="dashboard-card h-100" id="debug-conversation-details" style="display: none;">
-                        <!-- Conversation details will be added here by JS -->
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h3 id="debug-conversation-title">Conversation Analysis</h3>
+                                <div>
+                                    <span class="badge bg-info" id="debug-log-count">0 logs</span>
+                                </div>
+                            </div>
+                            <!-- Tabbed Navigation -->
+                            <ul class="nav nav-tabs card-header-tabs mt-3" id="debug-tabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="debug-analysis-tab" data-bs-toggle="tab" data-bs-target="#debug-analysis" type="button" role="tab" aria-controls="debug-analysis" aria-selected="true">
+                                        <i class="bi bi-graph-up me-1"></i>Analysis
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="debug-relationships-tab" data-bs-toggle="tab" data-bs-target="#debug-relationships" type="button" role="tab" aria-controls="debug-relationships" aria-selected="false">
+                                        <i class="bi bi-diagram-3 me-1"></i>Relationships
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="debug-raw-tab" data-bs-toggle="tab" data-bs-target="#debug-raw" type="button" role="tab" aria-controls="debug-raw" aria-selected="false">
+                                        <i class="bi bi-code-slash me-1"></i>Raw Data
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="debug-timeline-tab" data-bs-toggle="tab" data-bs-target="#debug-timeline" type="button" role="tab" aria-controls="debug-timeline" aria-selected="false">
+                                        <i class="bi bi-clock-history me-1"></i>Timeline
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="tab-content" id="debug-tab-content">
+                                <!-- Analysis Tab -->
+                                <div class="tab-pane fade show active p-3" id="debug-analysis" role="tabpanel" aria-labelledby="debug-analysis-tab">
+                                    <!-- User Request -->
+                                    <div class="alert alert-info" id="debug-conversation-request">
+                                        <h5 class="alert-heading">User Request</h5>
+                                        <p class="mb-0">Loading request...</p>
+                                    </div>
+                                    
+                                    <!-- Insight Cards -->
+                                    <h5 class="mt-4 mb-3">Analysis Insights</h5>
+                                    <div class="row g-3" id="debug-insight-cards">
+                                        <!-- Insight cards will be added here by JS -->
+                                        <div class="col-md-6 col-lg-4">
+                                            <div class="card h-100">
+                                                <div class="card-header d-flex justify-content-between">
+                                                    <span>Category Distribution</span>
+                                                    <span class="badge bg-primary">Top 5</span>
+                                                </div>
+                                                <div class="card-body">
+                                                    <canvas id="category-distribution-chart" height="200"></canvas>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 col-lg-4">
+                                            <div class="card h-100">
+                                                <div class="card-header d-flex justify-content-between">
+                                                    <span>Concept Distribution</span>
+                                                    <span class="badge bg-primary">Top 5</span>
+                                                </div>
+                                                <div class="card-body">
+                                                    <canvas id="concept-distribution-chart" height="200"></canvas>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 col-lg-4">
+                                            <div class="card h-100">
+                                                <div class="card-header d-flex justify-content-between">
+                                                    <span>Restaurant Distribution</span>
+                                                    <span class="badge bg-primary">Top 5</span>
+                                                </div>
+                                                <div class="card-body">
+                                                    <canvas id="restaurant-distribution-chart" height="200"></canvas>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Detected Concepts -->
+                                    <h5 class="mt-4 mb-3">Detected Concepts</h5>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover debug-concept-table" id="debug-concepts-table">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Category</th>
+                                                    <th>Concept</th>
+                                                    <th>Source</th>
+                                                    <th>Confidence</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <!-- Concepts will be added here by JS -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                
+                                <!-- Relationships Tab -->
+                                <div class="tab-pane fade p-3" id="debug-relationships" role="tabpanel" aria-labelledby="debug-relationships-tab">
+                                    <div class="d-flex justify-content-between mb-3">
+                                        <h5 class="mb-0">Concept-Restaurant Associations</h5>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-secondary active" data-view="network">
+                                                <i class="bi bi-diagram-3 me-1"></i>Network
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary" data-view="matrix">
+                                                <i class="bi bi-grid-3x3 me-1"></i>Matrix
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary" data-view="table">
+                                                <i class="bi bi-table me-1"></i>Table
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Filter Controls -->
+                                    <div class="mb-3 p-2 border rounded bg-light">
+                                        <div class="row g-2">
+                                            <div class="col-md-4">
+                                                <label class="form-label small mb-1">Category Filter</label>
+                                                <select class="form-select form-select-sm" id="relationship-category-filter">
+                                                    <option value="all" selected>All Categories</option>
+                                                    <!-- Categories will be added here by JS -->
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small mb-1">Concept Filter</label>
+                                                <select class="form-select form-select-sm" id="relationship-concept-filter">
+                                                    <option value="all" selected>All Concepts</option>
+                                                    <!-- Concepts will be added here by JS -->
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small mb-1">Restaurant Filter</label>
+                                                <select class="form-select form-select-sm" id="relationship-restaurant-filter">
+                                                    <option value="all" selected>All Restaurants</option>
+                                                    <!-- Restaurants will be added here by JS -->
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Relationship Views -->
+                                    <div id="relationship-views">
+                                        <!-- Network Visualization -->
+                                        <div id="relationship-network-view" class="relationship-view">
+                                            <div class="border rounded" style="height: 500px; position: relative;">
+                                                <div id="relationship-network-chart" style="height: 100%"></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Matrix Visualization -->
+                                        <div id="relationship-matrix-view" class="relationship-view d-none">
+                                            <div class="border rounded" style="height: 500px; overflow: auto;">
+                                                <div id="relationship-matrix-chart" style="height: 100%"></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Table Visualization -->
+                                        <div id="relationship-table-view" class="relationship-view d-none">
+                                            <div class="table-responsive border rounded">
+                                                <table class="table table-sm table-hover" id="relationship-table">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>Category</th>
+                                                            <th>Concept</th>
+                                                            <th>Restaurant</th>
+                                                            <th>Count</th>
+                                                            <th>Confidence</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <!-- Table content will be populated by JS -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Raw Data Tab -->
+                                <div class="tab-pane fade p-3" id="debug-raw" role="tabpanel" aria-labelledby="debug-raw-tab">
+                                    <ul class="nav nav-pills mb-3" id="debug-raw-tabs" role="tablist">
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link active" id="debug-raw-debug-tab" data-bs-toggle="pill" data-bs-target="#debug-raw-debug" type="button" role="tab" aria-controls="debug-raw-debug" aria-selected="true">Debug Logs</button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="debug-raw-concepts-tab" data-bs-toggle="pill" data-bs-target="#debug-raw-concepts" type="button" role="tab" aria-controls="debug-raw-concepts" aria-selected="false">Concept Data</button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="debug-raw-metadata-tab" data-bs-toggle="pill" data-bs-target="#debug-raw-metadata" type="button" role="tab" aria-controls="debug-raw-metadata" aria-selected="false">Metadata</button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="debug-raw-complete-tab" data-bs-toggle="pill" data-bs-target="#debug-raw-complete" type="button" role="tab" aria-controls="debug-raw-complete" aria-selected="false">Complete JSON</button>
+                                        </li>
+                                    </ul>
+                                    <div class="tab-content" id="debug-raw-tab-content">
+                                        <div class="tab-pane fade show active" id="debug-raw-debug" role="tabpanel" aria-labelledby="debug-raw-debug-tab">
+                                            <div class="p-2 border rounded bg-light mb-3">
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">Filter</span>
+                                                    <input type="text" class="form-control" id="debug-logs-filter" placeholder="Type to filter debug logs...">
+                                                </div>
+                                            </div>
+                                            <pre class="debug-content" id="debug-raw-logs"></pre>
+                                        </div>
+                                        <div class="tab-pane fade" id="debug-raw-concepts" role="tabpanel" aria-labelledby="debug-raw-concepts-tab">
+                                            <pre class="debug-content" id="debug-raw-concepts-json"></pre>
+                                        </div>
+                                        <div class="tab-pane fade" id="debug-raw-metadata" role="tabpanel" aria-labelledby="debug-raw-metadata-tab">
+                                            <pre class="debug-content" id="debug-raw-metadata-json"></pre>
+                                        </div>
+                                        <div class="tab-pane fade" id="debug-raw-complete" role="tabpanel" aria-labelledby="debug-raw-complete-tab">
+                                            <pre class="debug-content" id="debug-raw-complete-json"></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Timeline Tab -->
+                                <div class="tab-pane fade p-3" id="debug-timeline" role="tabpanel" aria-labelledby="debug-timeline-tab">
+                                    <h5 class="mb-3">Processing Timeline</h5>
+                                    <div class="timeline-wrapper" id="debug-processing-timeline">
+                                        <!-- Timeline will be generated by JS -->
+                                        <div class="timeline-loading text-center p-5">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading timeline...</span>
+                                            </div>
+                                            <p class="mt-2">Loading processing timeline...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Placeholder when no conversation is selected -->
@@ -66,69 +328,131 @@
         </div>
     </div>
     
-    <!-- Cross-Conversation Analysis Tables -->
-    <div class="dashboard-row">
-        <div class="dashboard-card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h3><i class="bi bi-diagram-3 me-2"></i>Concept-Restaurant Associations</h3>
-                <div class="btn-group">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="debug-toggle-table-view">
-                        <i class="bi bi-table me-1"></i>Toggle View
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="debug-refresh-associations">
-                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh Data
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                        <i class="bi bi-funnel me-1"></i>Filter
-                    </button>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="#" data-filter="all">All Associations</a></li>
-                        <li><a class="dropdown-item" href="#" data-filter="food">Food Categories</a></li>
-                        <li><a class="dropdown-item" href="#" data-filter="ambiance">Ambiance Categories</a></li>
-                        <li><a class="dropdown-item" href="#" data-filter="service">Service Categories</a></li>
-                    </ul>
-                </div>
+    <!-- Global Analysis Dashboard -->
+    <div class="dashboard-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3><i class="bi bi-diagram-3 me-2"></i>Global Debug Analysis</h3>
+            <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="debug-refresh-global">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh Data
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-funnel me-1"></i>Filter
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" data-filter="all">All Data</a></li>
+                    <li><a class="dropdown-item" href="#" data-filter="food">Food Categories</a></li>
+                    <li><a class="dropdown-item" href="#" data-filter="ambiance">Ambiance Categories</a></li>
+                    <li><a class="dropdown-item" href="#" data-filter="service">Service Categories</a></li>
+                </ul>
             </div>
-            <div class="card-body p-0">
-                <!-- Loading indicator -->
-                <div id="concept-restaurant-loading" class="text-center p-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading association data...</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <!-- Aggregate Stats Cards -->
+                <div class="col-md-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Top Categories</h6>
+                            <div class="list-group list-group-flush" id="global-top-categories">
+                                <!-- Will be populated by JS -->
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span class="text-truncate">Loading categories...</span>
+                                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <p class="mt-2">Loading concept-restaurant associations...</p>
                 </div>
                 
-                <!-- Error message placeholder -->
-                <div id="concept-restaurant-error" class="alert alert-warning m-3 d-none">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                    <span id="concept-restaurant-error-message">No association data available</span>
+                <div class="col-md-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Top Concepts</h6>
+                            <div class="list-group list-group-flush" id="global-top-concepts">
+                                <!-- Will be populated by JS -->
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span class="text-truncate">Loading concepts...</span>
+                                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
-                <!-- Table View (Default) -->
-                <div class="table-responsive d-none" id="concept-restaurant-table-view">
-                    <table class="table table-hover" id="concept-restaurant-table">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Category</th>
-                                <th>Concept</th>
-                                <th>Restaurant</th>
-                                <th>Count</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Table content will be populated by JS -->
-                        </tbody>
-                    </table>
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Concept-Restaurant Correlation</h6>
+                            <div id="concept-restaurant-heatmap" style="height: 180px;">
+                                <!-- Will be populated by JS -->
+                                <div class="d-flex justify-content-center align-items-center h-100">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                    <span class="ms-2">Loading correlation data...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
-                <!-- Accordion View (Hidden by Default) -->
-                <div class="accordion d-none" id="categoryRestaurantAccordion">
-                    <!-- Accordion items will be populated by JS -->
-                </div>
-                
-                <!-- Empty state message -->
-                <div id="no-associations-message" class="alert alert-info m-3 d-none">
-                    <i class="bi bi-info-circle me-2"></i>No concept-restaurant associations found. This could mean the debug data doesn't contain association information.
+                <!-- Restaurant Association Table -->
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Restaurant-Concept Associations</h6>
+                            <div class="input-group input-group-sm w-auto">
+                                <input type="text" class="form-control" id="association-search" placeholder="Search associations...">
+                                <button class="btn btn-outline-secondary" type="button">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm" id="global-association-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Concept</th>
+                                            <th>Restaurant</th>
+                                            <th>Count</th>
+                                            <th>Confidence</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Will be populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Hidden elements for backward compatibility with JS -->
+                            <div id="concept-restaurant-table-view" class="d-none">
+                                <table class="table table-hover d-none">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Concept</th>
+                                            <th>Restaurant</th>
+                                            <th>Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="concept-restaurant-table">
+                                        <!-- Empty table for backward compatibility -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="concept-restaurant-error" class="alert alert-warning m-3 d-none">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                <span id="concept-restaurant-error-message">No association data available</span>
+                            </div>
+                            <div id="no-associations-message" class="alert alert-info m-3 d-none">
+                                <i class="bi bi-info-circle me-2"></i>No concept-restaurant associations found. This could mean the debug data doesn't contain association information.
+                            </div>
+                            <div id="categoryRestaurantAccordion" class="d-none">
+                                <!-- Empty accordion for backward compatibility -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -136,21 +460,60 @@
 </div>
 
 <style>
-    /* Custom styles for debug insights layout */
+    /* Timeline styles */
+    .timeline-wrapper {
+        position: relative;
+        margin: 0 auto;
+    }
+    
+    .timeline-item {
+        padding: 0 0 20px 25px;
+        position: relative;
+        border-left: 1px solid var(--bs-primary);
+    }
+    
+    .timeline-item:last-child {
+        border-left: 1px solid transparent;
+    }
+    
+    .timeline-marker {
+        position: absolute;
+        left: -8px;
+        top: 0;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background: var(--bs-primary);
+        border: 2px solid white;
+    }
+    
+    .timeline-content {
+        padding: 10px 15px;
+        border-radius: 5px;
+        border: 1px solid var(--border-color);
+        background: white;
+    }
+    
+    .timeline-title {
+        margin-bottom: 5px;
+        font-weight: 600;
+    }
+    
+    .timeline-time {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+    
+    /* Relationship view styles */
+    .relationship-view {
+        margin-top: 1rem;
+    }
+    
+    /* Debug conversation grid */
     .debug-conversation-grid {
         display: grid;
         grid-template-columns: 300px 1fr;
         gap: 20px;
-    }
-    
-    .debug-content #debug-conversation-details {
-        overflow-y: auto;
-        max-height: none;
-    }
-    
-    .debug-content #debug-conversation-details .card-body {
-        overflow-y: auto;
-        padding: 20px;
     }
     
     @media (max-width: 992px) {
@@ -197,38 +560,37 @@
             });
         }
         
-        // Toggle between table and accordion views
-        const toggleViewBtn = document.getElementById('debug-toggle-table-view');
-        const tableView = document.getElementById('concept-restaurant-table-view');
-        const accordionView = document.getElementById('categoryRestaurantAccordion');
+        // Toggle between relationship visualization views
+        const viewButtons = document.querySelectorAll('[data-view]');
+        const relationshipViews = document.querySelectorAll('.relationship-view');
         
-        if (toggleViewBtn && tableView && accordionView) {
-            toggleViewBtn.addEventListener('click', function() {
-                tableView.classList.toggle('d-none');
-                accordionView.classList.toggle('d-none');
+        viewButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Set active state
+                viewButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
                 
-                // Update button icon and text
-                const icon = this.querySelector('i');
-                if (tableView.classList.contains('d-none')) {
-                    icon.className = 'bi bi-list me-1';
-                    this.innerHTML = '<i class="bi bi-list me-1"></i>List View';
-                } else {
-                    icon.className = 'bi bi-table me-1';
-                    this.innerHTML = '<i class="bi bi-table me-1"></i>Table View';
-                }
+                // Show selected view and hide others
+                const targetView = this.getAttribute('data-view');
+                relationshipViews.forEach(view => {
+                    view.classList.add('d-none');
+                });
+                
+                document.getElementById(`relationship-${targetView}-view`).classList.remove('d-none');
+                
+                // Trigger resize event for charts that need to adjust
+                window.dispatchEvent(new Event('resize'));
             });
-        }
+        });
         
         // Refresh associations data button
-        const refreshBtn = document.getElementById('debug-refresh-associations');
+        const refreshBtn = document.getElementById('debug-refresh-global');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', function() {
-                // Show loading indicator
-                document.getElementById('concept-restaurant-loading').classList.remove('d-none');
-                document.getElementById('concept-restaurant-table-view').classList.add('d-none');
-                document.getElementById('categoryRestaurantAccordion').classList.add('d-none');
-                document.getElementById('no-associations-message').classList.add('d-none');
-                document.getElementById('concept-restaurant-error').classList.add('d-none');
+                // Show loading indicators
+                document.querySelectorAll('.spinner-border').forEach(spinner => {
+                    spinner.parentElement.classList.remove('d-none');
+                });
                 
                 // Trigger refresh of debug insights data via custom event
                 const event = new CustomEvent('debugInsights:refreshAssociations');
@@ -271,6 +633,37 @@
             } else if (noMatchesMsg) {
                 noMatchesMsg.remove();
             }
+        }
+        
+        // Filter for raw debug logs
+        const logsFilter = document.getElementById('debug-logs-filter');
+        if (logsFilter) {
+            logsFilter.addEventListener('input', function() {
+                const filterTerm = this.value.toLowerCase();
+                const logsContent = document.getElementById('debug-raw-logs');
+                
+                if (!logsContent) return;
+                
+                // Store original logs if not already stored
+                if (!logsContent.dataset.original) {
+                    logsContent.dataset.original = logsContent.textContent;
+                }
+                
+                // Get original content
+                const originalContent = logsContent.dataset.original;
+                
+                if (!filterTerm) {
+                    // If no filter, restore original content
+                    logsContent.textContent = originalContent;
+                } else {
+                    // Filter logs line by line
+                    const lines = originalContent.split('\n');
+                    const filteredLines = lines.filter(line => 
+                        line.toLowerCase().includes(filterTerm)
+                    );
+                    logsContent.textContent = filteredLines.join('\n');
+                }
+            });
         }
     });
 </script>

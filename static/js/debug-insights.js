@@ -624,22 +624,32 @@ if (typeof window.DebugInsightsModule === 'undefined') {
     // Display cross-conversation insights with element checks
     function displayCrossConversationInsights(crossInsights) {
         try {
-            // Hide loading indicator and show appropriate content based on data
-            const loadingIndicator = document.getElementById('concept-restaurant-loading');
-            const errorMessage = document.getElementById('concept-restaurant-error');
-            const tableView = document.getElementById('concept-restaurant-table-view');
-            const accordionView = document.getElementById('categoryRestaurantAccordion');
-            const noDataMessage = document.getElementById('no-associations-message');
+            // Updated selectors to match the new HTML structure
+            const loadingIndicator = document.querySelector('.spinner-border');
+            const errorMessage = document.getElementById('concept-restaurant-error') || document.querySelector('.alert-danger');
             
-            if (loadingIndicator) loadingIndicator.classList.add('d-none');
+            // Check for both old and new element IDs for backwards compatibility
+            const tableView = document.getElementById('relationship-table-view') || 
+                             document.getElementById('concept-restaurant-table-view');
             
-            if (!crossInsights) {
+            // Updated to use the new accordion element ID
+            const accordionView = document.getElementById('relationship-views') ||
+                                 document.getElementById('categoryRestaurantAccordion');
+                                 
+            const noDataMessage = document.getElementById('no-associations-message') || 
+                                 document.querySelector('.alert-info');
+            
+            if (loadingIndicator) {
+                loadingIndicator.parentElement.classList.add('d-none');
+            }
+            
+            if (!crossInsights || Object.keys(crossInsights).length === 0) {
                 console.warn("No cross-conversation insights data available");
                 if (errorMessage) {
                     errorMessage.classList.remove('d-none');
-                    const errMsgElement = document.getElementById('concept-restaurant-error-message');
+                    const errMsgElement = errorMessage.querySelector('span') || errorMessage;
                     if (errMsgElement) {
-                        errMsgElement.textContent = "No cross-conversation data available from server";
+                        errMsgElement.textContent = "No concept-restaurant association data available from server";
                     }
                 }
                 return;
@@ -647,7 +657,9 @@ if (typeof window.DebugInsightsModule === 'undefined') {
             
             // Display concept-restaurant associations
             const hasTableData = displayConceptRestaurantAssociations(crossInsights);
-            const hasAccordionData = displayCategoryRestaurantAccordion(crossInsights);
+            
+            // If we're using the new UI, we can skip the old accordion display
+            const hasAccordionData = accordionView ? displayCategoryRestaurantAccordion(crossInsights) : false;
             
             // Show either table view or no data message based on results
             if (tableView && !tableView.classList.contains('d-none')) {
@@ -660,10 +672,10 @@ if (typeof window.DebugInsightsModule === 'undefined') {
             }
         } catch (error) {
             console.error("Error displaying cross-conversation insights:", error);
-            const errorMessage = document.getElementById('concept-restaurant-error');
+            const errorMessage = document.getElementById('concept-restaurant-error') || document.querySelector('.alert-danger');
             if (errorMessage) {
                 errorMessage.classList.remove('d-none');
-                const errMsgElement = document.getElementById('concept-restaurant-error-message');
+                const errMsgElement = errorMessage.querySelector('span') || errorMessage;
                 if (errMsgElement) {
                     errMsgElement.textContent = "Error displaying association data: " + error.message;
                 }
@@ -970,21 +982,24 @@ if (typeof window.DebugInsightsModule === 'undefined') {
     function displayConceptRestaurantAssociations(crossInsights) {
         if (!crossInsights) return false;
         
-        const tableBody = document.querySelector('#concept-restaurant-table tbody');
+        // Updated to look for both old and new table selectors for backwards compatibility
+        const tableBody = document.querySelector('#relationship-table tbody') || 
+                         document.querySelector('#concept-restaurant-table tbody');
+                         
         if (!tableBody) {
-            console.warn("Concept-restaurant table body element not found");
+            console.warn("Relationship table body element not found");
             return false;
         }
         
         tableBody.innerHTML = '';
         
-        if (crossInsights.concept_restaurant_associations && 
-            Array.isArray(crossInsights.concept_restaurant_associations) &&
-            crossInsights.concept_restaurant_associations.length > 0) {
+        // Check for concept-restaurant associations in the data
+        const associations = crossInsights.concept_restaurant_associations || [];
+        
+        if (Array.isArray(associations) && associations.length > 0) {
+            console.log(`Displaying ${associations.length} concept-restaurant associations`);
             
-            console.log(`Displaying ${crossInsights.concept_restaurant_associations.length} concept-restaurant associations`);
-            
-            crossInsights.concept_restaurant_associations.forEach(association => {
+            associations.forEach(association => {
                 const row = document.createElement('tr');
                 
                 const categoryCell = document.createElement('td');
@@ -1003,6 +1018,13 @@ if (typeof window.DebugInsightsModule === 'undefined') {
                 countCell.textContent = association.count || 0;
                 row.appendChild(countCell);
                 
+                // Add confidence cell if the table has 5 columns
+                if (tableBody.parentElement.querySelectorAll('th').length > 4) {
+                    const confidenceCell = document.createElement('td');
+                    confidenceCell.textContent = association.confidence?.toFixed(2) || "N/A";
+                    row.appendChild(confidenceCell);
+                }
+                
                 tableBody.appendChild(row);
             });
             return true;
@@ -1014,56 +1036,79 @@ if (typeof window.DebugInsightsModule === 'undefined') {
     function displayCategoryRestaurantAccordion(crossInsights) {
         if (!crossInsights) return false;
         
+        // Look for either the network view or the old accordion element
+        const networkView = document.getElementById('relationship-network-chart');
         const accordion = document.getElementById('categoryRestaurantAccordion');
-        if (!accordion) {
-            console.warn("Category-restaurant accordion element not found");
+        
+        if (!networkView && !accordion) {
+            console.warn("Neither network chart nor accordion element found");
             return false;
         }
         
-        accordion.innerHTML = '';
-        
-        if (crossInsights.category_restaurant_associations && 
-            Array.isArray(crossInsights.category_restaurant_associations) && 
-            crossInsights.category_restaurant_associations.length > 0) {
+        // If we have the new network view, assume the new UI is in place and skip old accordion
+        if (networkView) {
+            // Here you would initialize a network visualization with D3, VisJS, or another library
+            console.log("Network view found, initializing relationship network");
+            try {
+                // Simple placeholder visualization (should be replaced with actual network viz)
+                networkView.innerHTML = `<div class="p-5 text-center">
+                    <p>Network visualization would be rendered here</p>
+                    <p>Found ${crossInsights.concept_restaurant_associations?.length || 0} 
+                       concept-restaurant associations</p>
+                </div>`;
+                return true;
+            } catch (e) {
+                console.error("Failed to initialize network visualization", e);
+                return false;
+            }
+        } else if (accordion) {
+            // Old accordion logic
+            accordion.innerHTML = '';
             
-            console.log(`Displaying ${crossInsights.category_restaurant_associations.length} category-restaurant associations`);
-            
-            crossInsights.category_restaurant_associations.forEach((category, index) => {
-                const accordionItem = document.createElement('div');
-                accordionItem.className = 'accordion-item';
+            if (crossInsights.category_restaurant_associations && 
+                Array.isArray(crossInsights.category_restaurant_associations) && 
+                crossInsights.category_restaurant_associations.length > 0) {
                 
-                const headerId = `heading${index}`;
-                const collapseId = `collapse${index}`;
+                console.log(`Displaying ${crossInsights.category_restaurant_associations.length} category-restaurant associations`);
                 
-                accordionItem.innerHTML = `
-                    <h2 class="accordion-header" id="${headerId}">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                            data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
-                            ${category.category || "Unknown Category"} (${category.top_restaurants?.length || 0} restaurants)
-                        </button>
-                    </h2>
-                    <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}"
-                        data-bs-parent="#categoryRestaurantAccordion">
-                        <div class="accordion-body p-0">
-                            <ul class="list-group list-group-flush">
-                                ${category.top_restaurants ? category.top_restaurants.map(r => 
-                                    `<li class="list-group-item d-flex justify-content-between align-items-center">
-                                        ${r.name || "Unknown"}
-                                        <span class="badge bg-primary rounded-pill">${r.count || 0}</span>
-                                     </li>`
-                                ).join('') : '<li class="list-group-item">No restaurant data available</li>'}
-                            </ul>
+                crossInsights.category_restaurant_associations.forEach((category, index) => {
+                    const accordionItem = document.createElement('div');
+                    accordionItem.className = 'accordion-item';
+                    
+                    const headerId = `heading${index}`;
+                    const collapseId = `collapse${index}`;
+                    
+                    accordionItem.innerHTML = `
+                        <h2 class="accordion-header" id="${headerId}">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
+                                ${category.category || "Unknown Category"} (${category.top_restaurants?.length || 0} restaurants)
+                            </button>
+                        </h2>
+                        <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}"
+                            data-bs-parent="#categoryRestaurantAccordion">
+                            <div class="accordion-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    ${category.top_restaurants ? category.top_restaurants.map(r => 
+                                        `<li class="list-group-item d-flex justify-content-between align-items-center">
+                                            ${r.name || "Unknown"}
+                                            <span class="badge bg-primary rounded-pill">${r.count || 0}</span>
+                                         </li>`
+                                    ).join('') : '<li class="list-group-item">No restaurant data available</li>'}
+                                </ul>
+                            </div>
                         </div>
-                    </div>
-                `;
-                
-                accordion.appendChild(accordionItem);
-            });
-            return true;
-        } else {
-            console.warn("No category-restaurant associations data available or invalid format");
-            return false;
+                    `;
+                    
+                    accordion.appendChild(accordionItem);
+                });
+                return true;
+            } else {
+                console.warn("No category-restaurant associations data available or invalid format");
+                return false;
+            }
         }
+        return false;
     }
 
     // Display initial concepts analysis
