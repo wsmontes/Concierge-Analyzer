@@ -1,0 +1,76 @@
+<!-- 
+  Recommendations analysis tab component for Concierge Chat Analyzer
+  Provides detailed analysis of restaurant recommendations and accuracy
+-->
+<div class="tab-pane fade print-section" id="recommendations" role="tabpanel" aria-labelledby="recommendations-tab">
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">Recommendation Statistics</div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3"><strong>Avg. Precision:</strong></div>
+                        <div class="progress flex-grow-1" style="height: 20px">
+                            <div id="avg-precision-bar" class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3"><strong>Avg. Recall:</strong></div>
+                        <div class="progress flex-grow-1" style="height: 20px">
+                            <div id="avg-recall-bar" class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3"><strong>Avg. Accuracy:</strong></div>
+                        <div class="progress flex-grow-1" style="height: 20px">
+                            <div id="avg-accuracy-bar" class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header">Recommendation Counts</div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="recommendation-count-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header">Metrics Distribution</div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="metrics-distribution-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">Detailed Recommendations Comparison</div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered table-sm" id="recommendations-comparison-table" style="width: 100%;">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 5%;">#</th>
+                            <th style="width: 8%;">Persona</th>
+                            <th style="width: 17%;">Request</th>
+                            <th style="width: 30%;">Expected</th>
+                            <th style="width: 30%;">Actual</th>
+                            <th style="width: 10%;">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Rows will be inserted here by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

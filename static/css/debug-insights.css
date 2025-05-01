@@ -1,0 +1,105 @@
+/**
+ * Debug insights styles for Concierge Chat Analyzer
+ * Contains styling for debug panels, insights charts, and analysis displays
+ */
+
+/* Debug insights panels */
+.debug-panel {
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.debug-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+    font-weight: 600;
+}
+
+.debug-panel-body {
+    padding: 15px;
+}
+
+/* Debug concept tables */
+.debug-concept-table {
+    font-size: 0.85rem;
+}
+
+.debug-concept-table th {
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+/* Debug sequence steps */
+.debug-sequence-step {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+}
+
+.debug-step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: #0d6efd;
+    color: white;
+    font-weight: bold;
+    font-size: 12px;
+    margin-right: 8px;
+}
+
+.debug-step-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+}
+
+/* Debug content display */
+.debug-content {
+    background-color: rgba(0,0,0,0.03);
+    padding: 10px;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 0.8rem;
+    overflow-x: auto;
+}
+
+/* Debug restaurant score display */
+.debug-restaurant-score {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.debug-score-bar {
+    flex-grow: 1;
+    height: 6px;
+    background-color: #e9ecef;
+    border-radius: 3px;
+    margin-left: 8px;
+    overflow: hidden;
+}
+
+.debug-score-fill {
+    height: 100%;
+    border-radius: 3px;
+}
+
+.debug-high-score {
+    background-color: #28a745;
+}
+
+.debug-medium-score {
+    background-color: #fd7e14;
+}
+
+.debug-low-score {
+    background-color: #dc3545;
+}

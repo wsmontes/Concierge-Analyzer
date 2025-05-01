@@ -1,0 +1,36 @@
+<!-- 
+  Response time analysis component for Concierge Chat Analyzer
+  Visualizes response time metrics with charts and statistics
+-->
+<div class="card mb-4 print-section" id="response-time-section">
+    <div class="card-header">
+        <i class="bi bi-stopwatch me-2"></i>Response Time Analysis
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="chart-container">
+                    <canvas id="response-time-chart"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="row">
+                    <div class="col-md-6 col-lg-12">
+                        <div class="time-metric-card">
+                            <div class="time-metric-title">TIME TO FIRST RESPONSE</div>
+                            <div class="time-metric-value" id="min-first-response">Min: 0s</div>
+                            <div class="time-metric-value" id="max-first-response">Max: 0s</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-12">
+                        <div class="time-metric-card">
+                            <div class="time-metric-title">TIME TO RECOMMENDATION</div>
+                            <div class="time-metric-value" id="min-recommendation-time">Min: 0s</div>
+                            <div class="time-metric-value" id="max-recommendation-time">Max: 0s</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

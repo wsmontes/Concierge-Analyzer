@@ -1,0 +1,49 @@
+<!-- 
+  Summary dashboard component for Concierge Chat Analyzer
+  Displays key metrics and statistics from the analysis
+-->
+<div class="card mb-4 print-section" id="summary-section">
+    <div class="card-header">
+        <i class="bi bi-bar-chart-fill me-2"></i>Summary
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3 col-sm-6">
+                <div class="summary-card">
+                    <div class="summary-icon">
+                        <i class="bi bi-chat-square-text"></i>
+                    </div>
+                    <div class="summary-title">TOTAL CONVERSATIONS</div>
+                    <div class="summary-value" id="conversation-count">0</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="summary-card">
+                    <div class="summary-icon">
+                        <i class="bi bi-clock"></i>
+                    </div>
+                    <div class="summary-title">AVG. TIME TO RECOMMENDATION</div>
+                    <div class="summary-value" id="avg-recommendation-time">0s</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="summary-card">
+                    <div class="summary-icon">
+                        <i class="bi bi-lightning-charge"></i>
+                    </div>
+                    <div class="summary-title">AVG. FIRST RESPONSE</div>
+                    <div class="summary-value" id="avg-first-response">0s</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="summary-card">
+                    <div class="summary-icon">
+                        <i class="bi bi-person-check"></i>
+                    </div>
+                    <div class="summary-title">MATCHED PERSONAS</div>
+                    <div class="summary-value" id="matched-personas">0/0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

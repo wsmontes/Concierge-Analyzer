@@ -1,0 +1,88 @@
+/**
+ * Dashboard styles for Concierge Chat Analyzer
+ * Contains styling for the dashboard panels, charts, and metrics displays
+ */
+
+/* Time metrics display */
+.time-metric-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 10px;
+}
+
+.time-metric-title {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-bottom: 3px;
+}
+
+.time-metric-value {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+/* Accuracy badge styling */
+.accuracy-badge {
+    font-size: 0.8em;
+    padding: 4px 8px;
+    margin-left: 8px;
+}
+
+/* Stats card styling */
+.stat-card {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #0d6efd;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    color: #6c757d;
+}
+
+/* Restaurant match styling */
+.restaurant-match {
+    margin-bottom: 10px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    padding: 8px;
+}
+
+.restaurant-match-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+/* Metric pills */
+.metric-pill {
+    background-color: #e9ecef;
+    border-radius: 16px;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    color: #495057;
+    display: flex;
+    align-items: center;
+}
+
+.metric-pill i {
+    margin-right: 5px;
+}
+
+/* Dashboard stats layout */
+.conversation-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+    margin-bottom: 15px;
+}

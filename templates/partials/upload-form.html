@@ -1,0 +1,20 @@
+<!-- 
+  Upload form component for Concierge Chat Analyzer
+  Allows users to upload WhatsApp chat export files for analysis
+-->
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-upload me-2"></i>Upload Chat File
+    </div>
+    <div class="card-body">
+        <form id="upload-form">
+            <div class="mb-3">
+                <label for="chat-file" class="form-label">Select WhatsApp chat export file</label>
+                <input class="form-control" type="file" id="chat-file" name="chat_file">
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-search me-2"></i>Analyze
+            </button>
+        </form>
+    </div>
+</div>

@@ -1,0 +1,109 @@
+<!-- 
+  Conversations tab component for Concierge Chat Analyzer
+  Displays conversation list and details with filtering options
+-->
+<div class="tab-pane fade" id="conversations" role="tabpanel" aria-labelledby="conversations-tab">
+    <div class="conversation-filter-container mb-3">
+        <div class="row conversation-filter-row">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" id="conversation-search" class="form-control" placeholder="Search requests...">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select id="persona-filter" class="form-select">
+                    <option value="">All Personas</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select id="accuracy-filter" class="form-select">
+                    <option value="">All Accuracy</option>
+                    <option value="high">High (≥75%)</option>
+                    <option value="medium">Medium (50-74%)</option>
+                    <option value="low">Low (<50%)</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button id="reset-filters" class="btn btn-outline-secondary w-100">Reset</button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <span class="badge bg-primary me-1" id="conversations-count">0</span> conversation(s) found
+            </div>
+        </div>
+    </div>
+    <div class="row g-3">
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div><i class="bi bi-list-ul me-2"></i>Conversations List</div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="time-sort-toggle">
+                        <label class="form-check-label" for="time-sort-toggle">Sort by Time</label>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush conversations-list sticky-list" id="conversations-list">
+                        <!-- Conversations will be added here by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <!-- Selected Conversation -->
+            <div class="card h-100 d-none" id="conversation-details">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <span id="conversation-title">Conversation Details</span>
+                        <span id="persona-badge" class="badge bg-info ms-2"></span>
+                    </div>
+                    <div>
+                        <div class="form-check form-switch d-inline-block me-3">
+                            <input class="form-check-input" type="checkbox" id="debug-toggle">
+                            <label class="form-check-label" for="debug-toggle">Show Debug Messages</label>
+                        </div>
+                        <button id="export-conversation" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-download me-1"></i>Export
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="conversation-header">
+                        <div class="conversation-metrics mb-3">
+                            <div class="metric-pill"><i class="bi bi-clock"></i> <span id="conv-time-to-first">-</span></div>
+                            <div class="metric-pill"><i class="bi bi-hourglass"></i> <span id="conv-time-to-rec">-</span></div>
+                            <div class="metric-pill"><i class="bi bi-calendar3"></i> <span id="conv-date">-</span></div>
+                            <div class="metric-pill"><i class="bi bi-chat-dots"></i> <span id="conv-message-count">-</span></div>
+                        </div>
+
+                        <div id="conversation-persona-details">
+                            <!-- Persona details will be shown here -->
+                        </div>
+                    </div>
+                    
+                    <div id="restaurant-matches" class="mb-3 d-none">
+                        <h6>Restaurant Matches Analysis</h6>
+                        <div id="restaurant-matches-container">
+                            <!-- Restaurant matches will be shown here -->
+                        </div>
+                    </div>
+                    
+                    <div id="conversation-container" class="conversation-container">
+                        <!-- Messages will be added here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Placeholder when no conversation is selected -->
+            <div class="card h-100" id="no-conversation-placeholder">
+                <div class="card-body d-flex flex-column align-items-center justify-content-center text-center text-muted">
+                    <i class="bi bi-chat-square-text mb-3" style="font-size: 3rem;"></i>
+                    <h5>Select a conversation from the list</h5>
+                    <p>Conversation details will appear here</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

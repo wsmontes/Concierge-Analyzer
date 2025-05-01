@@ -1,0 +1,192 @@
+<!-- 
+  Debug insights tab component for Concierge Chat Analyzer
+  Provides detailed analysis of debug data across conversations
+-->
+<div class="tab-pane fade print-section" id="debug-insights" role="tabpanel" aria-labelledby="debug-insights-tab">
+    <!-- Global Debug Insights Section -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <h5><i class="bi bi-graph-up me-2"></i>Global Debug Insights</h5>
+            <p class="text-muted">Explore insights extracted from debug data across all conversations</p>
+        </div>
+    </div>
+    
+    <!-- Stats Summary -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="summary-icon">
+                        <i class="bi bi-tags"></i>
+                    </div>
+                    <div class="summary-title">CATEGORIES</div>
+                    <div class="summary-value" id="debug-category-count">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="summary-icon">
+                        <i class="bi bi-grid-3x3"></i>
+                    </div>
+                    <div class="summary-title">CONCEPTS</div>
+                    <div class="summary-value" id="debug-concept-count">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="summary-icon">
+                        <i class="bi bi-cup-hot"></i>
+                    </div>
+                    <div class="summary-title">RESTAURANTS</div>
+                    <div class="summary-value" id="debug-restaurant-count">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="summary-icon">
+                        <i class="bi bi-rocket"></i>
+                    </div>
+                    <div class="summary-title">ASSOCIATIONS</div>
+                    <div class="summary-value" id="debug-association-count">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Category Analysis -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div><i class="bi bi-tags me-2"></i>Top Categories</div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="category-distribution-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div><i class="bi bi-grid-3x3 me-2"></i>Top Concepts</div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="concept-distribution-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Restaurant Analysis Section - Add the missing restaurant chart -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="bi bi-cup-hot me-2"></i>Top Restaurants
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="restaurant-distribution-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="bi bi-tags me-2"></i>Categories & Their Top Restaurants
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="categoryRestaurantAccordion">
+                        <!-- Category-restaurant items will be added here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Network & Relationship Section -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="bi bi-diagram-3 me-2"></i>Concept Network
+                </div>
+                <div class="card-body">
+                    <div id="concept-network-container" style="height: 400px;"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="bi bi-graph-up me-2"></i>Top Concept-Restaurant Associations
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm table-hover" id="concept-restaurant-table">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Concept</th>
+                                    <th>Restaurant</th>
+                                    <th>Count</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Associations will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Conversation-level Debug Analysis section -->
+    <div class="row mb-3 mt-4">
+        <div class="col-12">
+            <h5><i class="bi bi-chat-right-text me-2"></i>Conversation-level Debug Analysis</h5>
+            <p class="text-muted">Select a conversation to view its debug analysis</p>
+        </div>
+    </div>
+    
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-list-ul me-2"></i>Select Conversation
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush" id="debug-conversation-list">
+                        <!-- Conversations will be added here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card d-none" id="debug-conversation-details">
+                <!-- Conversation details will be added here -->
+            </div>
+            
+            <!-- Placeholder when no conversation is selected -->
+            <div class="card" id="debug-no-conversation-placeholder">
+                <div class="card-body d-flex flex-column align-items-center justify-content-center text-center text-muted">
+                    <i class="bi bi-bug mb-3" style="font-size: 3rem;"></i>
+                    <h5>Select a conversation to view debug analysis</h5>
+                    <p>Debug details will appear here</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

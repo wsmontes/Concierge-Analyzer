@@ -1,0 +1,116 @@
+/**
+ * Conversation styles for Concierge Chat Analyzer
+ * Contains styling for conversation lists, messages, and conversation details
+ */
+
+/* Conversation containers */
+.conversation-container {
+    max-height: 450px;
+    overflow-y: auto;
+    background-color: #fff;
+    border-radius: 10px;
+}
+
+.conversation-list-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* List styling */
+.conversation-list-item {
+    border-left: 5px solid transparent;
+    transition: all 0.2s;
+    padding: 0.5rem 0.75rem;
+}
+
+.conversation-list-item:hover {
+    background-color: #f8f9fa;
+    border-left-color: #0d6efd;
+}
+
+.conversation-list-item.active {
+    background-color: #e9ecef;
+    border-left-color: #0d6efd;
+}
+
+/* Message styling */
+.message {
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    position: relative;
+    font-size: 0.9rem;
+}
+
+.message.user {
+    background-color: #e9ecef;
+    margin-left: 15%;
+    border-top-right-radius: 0;
+}
+
+.message.concierge {
+    background-color: #d1e7dd;
+    margin-right: 15%;
+    border-top-left-radius: 0;
+}
+
+.message.debug {
+    background-color: #f8d7da;
+    font-family: monospace;
+    font-size: 0.75em;
+    white-space: pre-wrap;
+}
+
+/* Message components */
+.message-sender {
+    font-weight: 600;
+    margin-bottom: 5px;
+    font-size: 0.85rem;
+}
+
+.message-timestamp {
+    font-size: 0.7rem;
+    color: #6c757d;
+    margin-bottom: 3px;
+}
+
+/* Filtering options */
+.conversation-filter-container {
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.conversation-filter-row {
+    margin-bottom: 10px;
+}
+
+/* Conversation header */
+.conversation-header {
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.conversation-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+/* Hide debug messages when the toggle is off */
+.hide-debug .message.debug {
+    display: none;
+}
+
+/* Sticky list */
+.sticky-list {
+    position: sticky;
+    top: 0;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
