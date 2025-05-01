@@ -668,11 +668,11 @@ def test():
 def upload_chat():
     logger.info("Received upload request")
     
-    if 'chat_file' not in request.files:
+    if 'file' not in request.files:  # Changed from 'chat_file' to 'file'
         logger.warning("No file uploaded in request")
         return jsonify({'error': 'No file uploaded'}), 400
     
-    file = request.files['chat_file']
+    file = request.files['file']  # Changed from 'chat_file' to 'file'
     
     if file.filename == '':
         logger.warning("Empty filename in uploaded file")

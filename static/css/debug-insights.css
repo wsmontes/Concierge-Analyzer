@@ -3,9 +3,54 @@
  * Contains styling for debug panels, insights charts, and analysis displays
  */
 
-/* Debug insights panels */
+/* Debug content wrapper */
+.debug-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Section headers */
+.section-header {
+    margin-bottom: 20px;
+}
+
+.section-icon {
+    font-size: 1.8rem;
+    color: var(--bs-primary);
+    background-color: rgba(58, 127, 246, 0.1);
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.section-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+/* Debug conversation grid */
+.debug-conversation-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 20px;
+}
+
+.debug-sidebar {
+    max-height: 600px;
+}
+
+/* Debug panels */
 .debug-panel {
-    border-radius: 8px;
+    border-radius: 10px;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
     margin-bottom: 15px;
 }
 
@@ -13,9 +58,10 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 15px;
-    border-bottom: 1px solid rgba(0,0,0,0.1);
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
     font-weight: 600;
+    color: var(--text-primary);
 }
 
 .debug-panel-body {
@@ -25,81 +71,116 @@
 /* Debug concept tables */
 .debug-concept-table {
     font-size: 0.85rem;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 .debug-concept-table th {
     font-weight: 600;
-    background-color: #f8f9fa;
+    background-color: var(--body-bg);
+    color: var(--text-primary);
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.debug-concept-table td {
+    padding: 10px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
 }
 
 /* Debug sequence steps */
 .debug-sequence-step {
-    padding: 10px;
-    margin-bottom: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
     border-radius: 8px;
-    background-color: #f8f9fa;
+    background-color: var(--body-bg);
+    border: 1px solid var(--border-color);
 }
 
 .debug-step-number {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
-    background-color: #0d6efd;
+    background-color: var(--bs-primary);
     color: white;
     font-weight: bold;
-    font-size: 12px;
-    margin-right: 8px;
+    font-size: 14px;
+    margin-right: 10px;
 }
 
 .debug-step-title {
     font-weight: 600;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     display: flex;
     align-items: center;
+    color: var(--text-primary);
 }
 
 /* Debug content display */
 .debug-content {
-    background-color: rgba(0,0,0,0.03);
-    padding: 10px;
-    border-radius: 6px;
-    font-family: monospace;
+    background-color: var(--body-bg);
+    padding: 12px;
+    border-radius: 8px;
+    font-family: 'Roboto Mono', monospace;
     font-size: 0.8rem;
     overflow-x: auto;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
 }
 
 /* Debug restaurant score display */
 .debug-restaurant-score {
     display: flex;
     align-items: center;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
 }
 
 .debug-score-bar {
     flex-grow: 1;
-    height: 6px;
-    background-color: #e9ecef;
-    border-radius: 3px;
-    margin-left: 8px;
+    height: 8px;
+    background-color: var(--body-bg);
+    border-radius: 4px;
+    margin-left: 10px;
     overflow: hidden;
 }
 
 .debug-score-fill {
     height: 100%;
-    border-radius: 3px;
+    border-radius: 4px;
 }
 
 .debug-high-score {
-    background-color: #28a745;
+    background-color: var(--bs-success);
 }
 
 .debug-medium-score {
-    background-color: #fd7e14;
+    background-color: var(--bs-warning);
 }
 
 .debug-low-score {
-    background-color: #dc3545;
+    background-color: var(--bs-danger);
+}
+
+/* Placeholder when no conversation is selected */
+.placeholder-icon {
+    font-size: 3rem;
+    color: var(--text-secondary);
+    opacity: 0.5;
+}
+
+/* Responsive layout */
+@media (max-width: 992px) {
+    .debug-conversation-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .debug-sidebar {
+        margin-bottom: 20px;
+    }
 }

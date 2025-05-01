@@ -10,7 +10,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingIndicator = document.getElementById('loading');
     const resultsContainer = document.getElementById('results-container');
     const exportPdfBtn = document.getElementById('export-pdf');
+    const exportPdfSidebarBtn = document.getElementById('export-pdf-sidebar');
     const exportPdfMobileBtn = document.getElementById('export-pdf-mobile');
+    const refreshDataBtn = document.getElementById('refresh-data');
     
     // Global data store for the application
     window.appData = {
@@ -22,15 +24,35 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize event listeners
     function initEventListeners() {
         // Form submission handler
-        uploadForm.addEventListener('submit', handleFormSubmit);
-        
-        // PDF Export functionality
-        if (window.PdfExportModule && exportPdfBtn) {
-            exportPdfBtn.addEventListener('click', window.PdfExportModule.exportPDF);
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', handleFormSubmit);
         }
         
-        if (window.PdfExportModule && exportPdfMobileBtn) {
-            exportPdfMobileBtn.addEventListener('click', window.PdfExportModule.exportPDF);
+        // PDF Export functionality
+        if (window.PdfExportModule) {
+            if (exportPdfBtn) {
+                exportPdfBtn.addEventListener('click', window.PdfExportModule.exportPDF);
+            }
+            
+            if (exportPdfSidebarBtn) {
+                exportPdfSidebarBtn.addEventListener('click', window.PdfExportModule.exportPDF);
+            }
+            
+            if (exportPdfMobileBtn) {
+                exportPdfMobileBtn.addEventListener('click', window.PdfExportModule.exportPDF);
+            }
+        }
+        
+        // Refresh data button
+        if (refreshDataBtn) {
+            refreshDataBtn.addEventListener('click', function() {
+                if (window.appData.lastUploadedData) {
+                    processData(window.appData.lastUploadedData);
+                    
+                    // Show toast notification
+                    showNotification('Data refreshed successfully', 'success');
+                }
+            });
         }
         
         // Initialize tab functionality
@@ -46,42 +68,58 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleFormSubmit(event) {
         event.preventDefault();
         
-        const formData = new FormData(uploadForm);
-        const chatFile = document.getElementById('chat-file').files[0];
+        const fileInput = document.getElementById('chat-file');
         
-        if (!chatFile) {
-            alert('Please select a file to upload');
+        // Validate that a file is selected
+        if (!fileInput.files || fileInput.files.length === 0) {
+            showNotification('Please select a file to upload', 'error');
+            return;
+        }
+        
+        const chatFile = fileInput.files[0];
+        
+        // Additional file validation
+        if (chatFile.type !== 'text/plain' && !chatFile.name.endsWith('.txt')) {
+            showNotification('Please select a valid text file (.txt)', 'error');
+            return;
+        }
+        
+        // Check file size (10MB limit)
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+        if (chatFile.size > MAX_FILE_SIZE) {
+            showNotification('File size exceeds the 10MB limit', 'error');
             return;
         }
         
         console.log(`Uploading file: ${chatFile.name}, size: ${chatFile.size} bytes`);
         
+        // Create FormData object and explicitly append the file
+        const formData = new FormData();
+        formData.append('file', chatFile);
+        
         // Show loading indicator
         loadingIndicator.classList.remove('d-none');
         resultsContainer.classList.add('d-none');
         
-        // Upload file
+        // Upload file with improved error handling
         fetch(`${CONFIG.API_URL}/upload`, {
             method: 'POST',
             body: formData,
+            // Don't set Content-Type header manually, let browser set it with boundary
         })
         .then(response => {
             console.log('Response status:', response.status);
             
             if (!response.ok) {
-                if (response.status === 405) {
-                    throw new Error('Method not allowed. The server doesn\'t accept POST requests at this endpoint.');
-                } else {
-                    return response.json().then(errorData => {
-                        throw new Error(`Server error: ${errorData.error || response.statusText}`);
-                    }).catch(err => {
-                        // If JSON parsing fails, throw original error
-                        if (err.name === 'SyntaxError') {
-                            throw new Error(`Server error: ${response.statusText}`);
-                        }
-                        throw err;
-                    });
-                }
+                return response.json().then(errorData => {
+                    throw new Error(`Server error: ${errorData.error || response.statusText}`);
+                }).catch(err => {
+                    // If JSON parsing fails, throw generic error with status
+                    if (err.name === 'SyntaxError') {
+                        throw new Error(`Server error (${response.status}): ${response.statusText}`);
+                    }
+                    throw err;
+                });
             }
             return response.json();
         })
@@ -103,10 +141,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Show export PDF button
             exportPdfBtn.classList.remove('d-none');
+            
+            // Show success notification
+            showNotification('Data loaded successfully!', 'success');
         })
         .catch(error => {
             console.error('Error uploading file:', error);
-            alert('Error uploading file: ' + error.message);
+            showNotification(`Error uploading file: ${error.message}`, 'error');
         })
         .finally(() => {
             loadingIndicator.classList.add('d-none');
@@ -236,6 +277,48 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('matched-personas').textContent = 
                 `${data.persona_summary.matched_conversations}/${data.conversation_count}`;
         }
+    }
+    
+    // Show notification toast
+    function showNotification(message, type = 'info') {
+        // Create toast container if it doesn't exist
+        let toastContainer = document.querySelector('.toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            document.body.appendChild(toastContainer);
+        }
+        
+        // Create toast element
+        const toastEl = document.createElement('div');
+        toastEl.className = `toast align-items-center text-white bg-${type === 'error' ? 'danger' : type}`;
+        toastEl.setAttribute('role', 'alert');
+        toastEl.setAttribute('aria-live', 'assertive');
+        toastEl.setAttribute('aria-atomic', 'true');
+        
+        // Toast content
+        toastEl.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        `;
+        
+        // Add to container
+        toastContainer.appendChild(toastEl);
+        
+        // Initialize and show toast
+        const toast = new bootstrap.Toast(toastEl, {
+            delay: 3000
+        });
+        toast.show();
+        
+        // Remove toast from DOM after it's hidden
+        toastEl.addEventListener('hidden.bs.toast', function() {
+            toastEl.remove();
+        });
     }
     
     // Initialize the application

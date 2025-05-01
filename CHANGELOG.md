@@ -1,6 +1,43 @@
 # Changelog
 
-All notable changes to the Concierge Chat Analyzer project will be documented in this file.
+## [Unreleased]
+
+### Fixed
+- Fixed responsive layout issues with the conversation table by:
+  - Removing conflicting CSS Grid layout that was fighting with Bootstrap's grid
+  - Adding proper flex layout and container sizing for all screen sizes
+  - Implementing a mobile-specific view with a back button for better navigation
+  - Ensuring correct overflow behavior for scrollable content
+- Fixed "Identifier 'isRendering' has already been declared" error by:
+  - Adding script loading protection to prevent multiple initializations of modules
+  - Using a more specific variable name (`isDebugInsightsRendering`) to avoid conflicts
+  - Adding a module existence check before defining variables
+- Fixed conversations table appearing in all sections by implementing proper section containment
+- Added safeguards to prevent multiple rendering of conversation lists
+- Implemented proper section cleanup when switching between sections
+- Added visibility controls to ensure section-specific content only appears in its section
+- Fixed "Canvas is already in use" errors in Debug Insights section by:
+  - Using Chart.js built-in Chart.getChart() method to ensure proper chart instance tracking
+  - Implementing proper chart destruction before recreating charts
+  - Adding debouncing to prevent multiple chart renders in quick succession
+  - Fixing race conditions with a rendering lock flag
+- Fixed multiple execution of chart rendering code that was causing duplicate charts
+- Added better debugging and logging for chart creation and destruction
+
+### Improved
+- Enhanced responsive layout for better usability on mobile devices
+- Added automatic UI adjustments based on screen size changes
+- Added mobile-optimized conversation viewing experience with back navigation
+- Added more comprehensive error handling for chart rendering failures
+- Consolidated chart rendering logic to reduce code duplication
+- Added visual error feedback when chart rendering fails
+- Implemented proper cleanup when switching between sections
+- Enhanced script loading mechanism to prevent duplicate module initialization
+
+## [1.0.0] - 2023-10-15
+
+### Added
+- Initial release of Concierge Analyzer
 
 ## [1.0.0] - 2023-10-25
 
@@ -106,3 +143,26 @@ All notable changes to the Concierge Chat Analyzer project will be documented in
 - Enhanced data inspection and logging throughout the application
 - Added fallback UI messages when no data is available
 - Implemented comprehensive error handling for all chart operations
+
+## [1.2.0] - 2023-11-10
+
+### Fixed
+- Fixed broken Conversations section display by:
+  - Correcting element ID references between HTML and JavaScript
+  - Updating section visibility detection logic
+  - Adding additional error handling and debug logging
+- Fixed Debug Insights section functionality by:
+  - Improving chart rendering with proper element checks
+  - Adding fallbacks for data structure variations
+  - Extending timeouts to ensure DOM is fully rendered
+  - Implementing comprehensive error messaging
+- Fixed data flow issues between components:
+  - Ensuring proper data propagation from upload to analysis
+  - Adding validation and type-checking for all API responses
+  - Improving error handling for missing or malformed data
+
+### Improved
+- Enhanced logging throughout the application for better debugging
+- Added robust element existence checks before DOM operations
+- Improved mobile responsiveness in conversation views
+- Optimized chart rendering with better error handling

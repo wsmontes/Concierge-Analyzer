@@ -3,108 +3,302 @@
  * Contains styling for conversation lists, messages, and conversation details
  */
 
-/* Conversation containers */
-.conversation-container {
-    max-height: 450px;
-    overflow-y: auto;
-    background-color: #fff;
-    border-radius: 10px;
+/* Remove the conflicting grid layout for #conversations-section */
+#conversations-section {
+    /* Remove the grid display that's conflicting with Bootstrap */
+    display: block;
+    width: 100%;
 }
 
+/* Fix the row and column layout specifically for conversation containers */
+#conversations-section > .row {
+    display: flex;
+    width: 100%;
+    margin: 0;
+}
+
+/* Ensure proper sizing for conversation containers */
 .conversation-list-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 400px;
+}
+
+/* Make the conversation container scrollable with proper max height */
+.conversation-container {
+    max-height: calc(100vh - 280px);
+    overflow-y: auto;
+    background-color: var(--card-bg);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    height: 100%;
+}
+
+/* Filter container */
+.conversation-filter-container {
+    background-color: var(--card-bg);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 15px;
+    box-shadow: var(--card-shadow);
+}
+
+.conversation-filter-row {
+    margin-bottom: 15px;
+}
+
+/* List styling - IMPROVED STYLING FOR BETTER VISIBILITY */
+.conversations-list {
+    max-height: calc(100vh - 250px);
+    overflow-y: auto;
+    border-radius: 10px;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
+    flex-grow: 1;
+}
+
+.conversation-list-item {
+    border-left: 4px solid transparent;
+    transition: all 0.2s;
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    display: block; /* Ensure block display for proper layout */
+}
+
+.conversation-list-item:hover {
+    background-color: var(--sidebar-item-hover);
+    border-left-color: var(--bs-primary);
+}
+
+.conversation-list-item.active {
+    background-color: var(--sidebar-active-bg);
+    border-left-color: var(--bs-primary);
+}
+
+/* Conversation details card */
+.conversation-details-card {
+    background-color: var(--card-bg);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
     height: 100%;
     display: flex;
     flex-direction: column;
 }
 
-/* List styling */
-.conversation-list-item {
-    border-left: 5px solid transparent;
-    transition: all 0.2s;
-    padding: 0.5rem 0.75rem;
+.conversation-header {
+    background-color: var(--body-bg);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
 }
 
-.conversation-list-item:hover {
-    background-color: #f8f9fa;
-    border-left-color: #0d6efd;
-}
-
-.conversation-list-item.active {
-    background-color: #e9ecef;
-    border-left-color: #0d6efd;
-}
-
-/* Message styling */
-.message {
+.conversation-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
     margin-bottom: 10px;
-    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+}
+
+.conversation-title i {
+    margin-right: 8px;
+    color: var(--bs-primary);
+}
+
+/* Conversation metrics */
+.conversation-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.metric-pill {
+    background-color: var(--body-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+}
+
+.metric-pill i {
+    margin-right: 8px;
+    color: var(--bs-primary);
+}
+
+/* Message styling - ENSURE PROPER DISPLAY */
+.message {
+    margin-bottom: 15px;
+    padding: 12px 15px;
     border-radius: 10px;
     position: relative;
     font-size: 0.9rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border-color);
 }
 
 .message.user {
-    background-color: #e9ecef;
-    margin-left: 15%;
+    background-color: var(--body-bg);
+    margin-left: 10%;
     border-top-right-radius: 0;
 }
 
 .message.concierge {
-    background-color: #d1e7dd;
-    margin-right: 15%;
+    background-color: rgba(58, 127, 246, 0.05);
+    margin-right: 10%;
     border-top-left-radius: 0;
+    border-left: 3px solid var(--bs-primary);
 }
 
 .message.debug {
-    background-color: #f8d7da;
+    background-color: rgba(232, 62, 140, 0.05);
     font-family: monospace;
     font-size: 0.75em;
     white-space: pre-wrap;
+    border-left: 3px solid var(--bs-danger);
 }
 
 /* Message components */
 .message-sender {
     font-weight: 600;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
     font-size: 0.85rem;
+    color: var(--text-primary);
 }
 
 .message-timestamp {
-    font-size: 0.7rem;
-    color: #6c757d;
-    margin-bottom: 3px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
 }
 
-/* Filtering options */
-.conversation-filter-container {
-    background-color: #f8f9fa;
-    padding: 10px;
-    border-radius: 8px;
-    margin-bottom: 10px;
-}
-
-.conversation-filter-row {
-    margin-bottom: 10px;
-}
-
-/* Conversation header */
-.conversation-header {
-    background-color: #f8f9fa;
-    padding: 10px;
-    border-radius: 8px;
-    margin-bottom: 10px;
-}
-
-.conversation-metrics {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 10px;
+.message-content {
+    line-height: 1.5;
+    color: var(--text-primary);
 }
 
 /* Hide debug messages when the toggle is off */
 .hide-debug .message.debug {
     display: none;
+}
+
+/* Restaurant matches */
+.restaurant-matches {
+    background-color: var(--body-bg);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
+}
+
+.restaurant-matches h6 {
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+.restaurant-matches h6 i {
+    margin-right: 8px;
+    color: var(--bs-primary);
+}
+
+/* Restaurant match items */
+.restaurant-match {
+    margin-bottom: 10px;
+    border-radius: 8px;
+    background-color: var(--card-bg);
+    padding: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.restaurant-match-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.match-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.match-status.match {
+    background-color: rgba(42, 181, 125, 0.1);
+    color: var(--bs-success);
+}
+
+.match-status.no-match {
+    background-color: rgba(232, 62, 140, 0.1);
+    color: var(--bs-danger);
+}
+
+/* Responsive layouts - IMPROVED RESPONSIVE BEHAVIOR */
+@media (max-width: 992px) {
+    /* Ensure columns stack properly on mobile */
+    #conversations-section > .row {
+        flex-direction: column;
+    }
+    
+    /* Add proper spacing between stacked columns */
+    #conversations-section > .row > .col-lg-4,
+    #conversations-section > .row > .col-lg-8 {
+        width: 100%;
+        padding: 0 15px;
+        margin-bottom: 20px;
+    }
+    
+    /* Make sure the list container has proper height on mobile */
+    .conversation-list-container {
+        min-height: 300px;
+        margin-bottom: 20px;
+    }
+    
+    /* Adjust conversation container height for mobile */
+    .conversation-container {
+        max-height: 400px;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Further adjustments for very small screens */
+    .conversation-filter-row {
+        flex-direction: column;
+    }
+    
+    .conversation-filter-row .col-md-4,
+    .conversation-filter-row .col-md-6,
+    .conversation-filter-row .col-md-2 {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    .conversation-metrics {
+        flex-direction: column;
+    }
+    
+    .message {
+        margin-left: 0;
+        margin-right: 0;
+    }
 }
 
 /* Sticky list */

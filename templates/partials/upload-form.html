@@ -1,20 +1,46 @@
 <!-- 
-  Upload form component for Concierge Chat Analyzer
-  Allows users to upload WhatsApp chat export files for analysis
+  File upload form component for Concierge Chat Analyzer
+  Handles WhatsApp chat file uploads for analysis
 -->
-<div class="card">
-    <div class="card-header">
-        <i class="bi bi-upload me-2"></i>Upload Chat File
-    </div>
-    <div class="card-body">
-        <form id="upload-form">
-            <div class="mb-3">
-                <label for="chat-file" class="form-label">Select WhatsApp chat export file</label>
-                <input class="form-control" type="file" id="chat-file" name="chat_file">
-            </div>
-            <button type="submit" class="btn btn-primary">
-                <i class="bi bi-search me-2"></i>Analyze
-            </button>
-        </form>
+<div class="upload-section">
+    <div class="dashboard-card">
+        <div class="card-header">
+            <h3><i class="bi bi-cloud-upload me-2"></i>Upload Chat Data</h3>
+        </div>
+        <div class="card-body">
+            <form id="upload-form" enctype="multipart/form-data" method="post">
+                <div class="mb-3">
+                    <p class="text-muted">
+                        Upload a WhatsApp chat export file to analyze Concierge AI performance metrics and conversation patterns.
+                    </p>
+                    <div class="upload-area" id="upload-area">
+                        <!-- Using 'file' as the field name to match server expectations -->
+                        <input type="file" id="chat-file" name="file" class="file-input" accept=".txt" required>
+                        <div class="upload-placeholder">
+                            <i class="bi bi-cloud-arrow-up"></i>
+                            <p>Drag and drop your chat export file here</p>
+                            <p class="small">or</p>
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="browse-button">Browse files</button>
+                        </div>
+                        <div class="selected-file d-none" id="selected-file">
+                            <i class="bi bi-file-text"></i>
+                            <p class="file-name">filename.txt</p>
+                            <button type="button" class="btn btn-sm btn-link text-danger" id="remove-file">
+                                <i class="bi bi-x-circle"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-text">
+                        Only .txt files exported from WhatsApp are supported (max 10MB).
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search me-2"></i>Analyze Chat Data
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
