@@ -199,11 +199,16 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error("DebugInsightsModule not found");
         }
         
-        // Show first tab by default
-        const firstTabButton = document.querySelector('#analysisTab button:first-child');
+        // Show Dashboard tab by default (since Persona tab is removed)
+        const firstTabButton = document.querySelector('.menu-item[data-target="dashboard-section"]');
         if (firstTabButton) {
             firstTabButton.click();
         }
+        
+        // Show PDF export button
+        exportPdfBtn.classList.remove('d-none');
+        if (exportPdfSidebarBtn) exportPdfSidebarBtn.classList.remove('d-none');
+        if (exportPdfMobileBtn) exportPdfMobileBtn.classList.remove('d-none');
     }
     
     // Update summary statistics

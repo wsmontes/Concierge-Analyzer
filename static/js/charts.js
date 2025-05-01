@@ -35,7 +35,7 @@ function displayCharts(data) {
     // Display response time chart
     displayResponseTimeChart(filteredMetrics);
     
-    // Display accuracy charts if persona data is available
+    // Display accuracy and persona-related charts in dashboard
     if (data.persona_summary) {
         displayAccuracyChart(data.metrics);
         displayAccuracyDistributionChart(data.persona_summary.accuracy_distribution);
@@ -458,23 +458,33 @@ function displayMetricsDistributionChart(metrics) {
 
 // Update recommendation metrics
 function updateRecommendationAnalysis(data) {
-    // Update recommendation stats
-    const avgPrecision = data.persona_summary.avg_precision * 100;
-    const avgRecall = data.persona_summary.avg_recall * 100;
-    const avgAccuracy = data.persona_summary.avg_accuracy * 100;
-    
-    const precisionBar = document.getElementById('avg-precision-bar');
-    const recallBar = document.getElementById('avg-recall-bar');
-    const accuracyBar = document.getElementById('avg-accuracy-bar');
-    
-    if (precisionBar && recallBar && accuracyBar) {
-        precisionBar.style.width = `${avgPrecision}%`;
-        precisionBar.textContent = `${avgPrecision.toFixed(1)}%`;
-        recallBar.style.width = `${avgRecall}%`;
-        recallBar.textContent = `${avgRecall.toFixed(1)}%`;
-        accuracyBar.style.width = `${avgAccuracy}%`;
-        accuracyBar.textContent = `${avgAccuracy.toFixed(1)}%`;
+    if (!data.persona_summary || !data.persona_summary.metrics) {
+        console.warn("No recommendation metrics available");
+        return;
     }
+    
+    const metrics = data.persona_summary.metrics;
+    
+    // Update both dashboard and recommendations metrics
+    // Dashboard metrics
+    updateProgressBar('avg-precision-bar', metrics.average_precision);
+    updateProgressBar('avg-recall-bar', metrics.average_recall);
+    updateProgressBar('avg-accuracy-bar', metrics.average_accuracy);
+    
+    // Recommendation statistics metrics (the moved ones)
+    updateProgressBar('rec-avg-precision-bar', metrics.average_precision);
+    updateProgressBar('rec-avg-recall-bar', metrics.average_recall);
+    updateProgressBar('rec-avg-accuracy-bar', metrics.average_accuracy);
+}
+
+// Helper function to update progress bars
+function updateProgressBar(elementId, value) {
+    const progressBar = document.getElementById(elementId);
+    if (!progressBar) return;
+    
+    const percentage = Math.round(value * 100);
+    progressBar.style.width = `${percentage}%`;
+    progressBar.textContent = `${percentage}%`;
 }
 
 // Update recommendations comparison table

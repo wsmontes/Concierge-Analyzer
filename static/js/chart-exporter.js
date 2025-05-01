@@ -89,6 +89,12 @@ const ChartExporter = {
                             currentY = margin;
                         }
                         
+                        // Skip any charts from personas section as they've been moved to dashboard
+                        if (chartConfig.section === 'personas-section') {
+                            console.log(`Skipping chart ${chartConfig.chartId} from personas section`);
+                            continue;
+                        }
+                        
                         // Add section title
                         doc.setFontSize(12);
                         doc.text(chartConfig.title, margin, currentY);
@@ -217,10 +223,8 @@ const ChartExporter = {
                     }
                     
                 } catch (error) {
-                    console.error('Error generating PDF report:', error);
-                    if (typeof callback === 'function') {
-                        callback(error);
-                    }
+                    console.error("Error processing charts:", error);
+                    callback(null, error);
                 }
             };
             
@@ -228,10 +232,8 @@ const ChartExporter = {
             processCharts();
             
         } catch (error) {
-            console.error('Error initializing PDF report:', error);
-            if (typeof callback === 'function') {
-                callback(error);
-            }
+            console.error("Error creating PDF report:", error);
+            callback(null, error);
         }
     }
 };

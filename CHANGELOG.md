@@ -2,11 +2,25 @@
 
 ## [Unreleased]
 
+### Added
+- Comprehensive redesign of Debug Insights section with:
+  - Reorganized layout for better visualization and data exploration
+  - Added missing association count metric with ID 'debug-association-count'
+  - Enhanced category-restaurant relationships display with accordion component
+  - Added search functionality for conversation list filtering
+  - Better empty state handling with conditional alerts
+
 ### Changed
 - Simplified the upload form to a minimalist drop area with automatic submission
 - Removed unnecessary panels, cards, and buttons while maintaining full functionality
 - Added automatic file upload when a valid file is selected or dropped
 - Improved user experience by eliminating the need for explicit submission
+- Refactored Debug Insights section to:
+  - Remove dashboard cards and move them to the Dashboard section
+  - Create a more focused conversation-level debug analysis interface
+  - Improve the concept-restaurant associations visualization with toggle view
+  - Add search functionality for conversation filtering
+  - Provide a streamlined UI for examining specific conversation debug data
 
 ### Fixed
 - Fixed responsive layout issues with the conversation table by:
@@ -29,6 +43,25 @@
   - Fixing race conditions with a rendering lock flag
 - Fixed multiple execution of chart rendering code that was causing duplicate charts
 - Added better debugging and logging for chart creation and destruction
+- Resolved "Element with ID 'debug-association-count' not found" warning
+- Fixed category-restaurant associations display format issue
+- Improved visualization layout for responsiveness and consistency
+- Added proper structure for concept-restaurant associations table
+- Fixed the element ID 'debug-association-count' warning by removing the element from the debug section
+- Corrected cross-conversation insights display with proper UI for both table and accordion views
+- Improved usability with search functionality and filtering for debug conversations
+- Added responsive design improvements for debug analysis interface
+- Improved height handling in the debug content frame to extend as much as needed:
+  - Set minimum height to 800px for content and sidebar
+  - Added scrollable list for conversation selection
+  - Fixed display issues with conversation details panel
+  - Improved responsive behavior for different screen sizes
+- Fixed concept-restaurant association table not showing values:
+  - Added proper loading indicator for association data
+  - Improved error handling with informative messages
+  - Added refresh button for association data
+  - Fixed visibility issues with table and accordion views
+  - Added empty state handling for when no association data is found
 
 ### Improved
 - Enhanced responsive layout for better usability on mobile devices
@@ -39,6 +72,10 @@
 - Added visual error feedback when chart rendering fails
 - Implemented proper cleanup when switching between sections
 - Enhanced script loading mechanism to prevent duplicate module initialization
+- Enhanced debug insights visualization with better chart layouts
+- Improved navigation and interactive elements in Debug Insights
+- Better structured HTML for consistency with other application sections
+- Added search filtering for conversation list
 
 ## [1.0.0] - 2023-10-15
 

@@ -1,121 +1,111 @@
 <!-- 
-  Debug insights tab component for Concierge Chat Analyzer
-  Provides detailed analysis of debug data across conversations
+  Debug insights visualization component for Concierge Chat Analyzer
+  Provides detailed analysis of conversation debug data and concept-restaurant associations
+  Dependencies: bootstrap, chart.js, debug-insights.js
 -->
 <div class="debug-content-wrapper">
-    <!-- Global Debug Insights Header -->
+    <!-- Debug Analysis Header -->
     <div class="section-header">
         <div class="d-flex align-items-center">
-            <i class="bi bi-graph-up me-3 section-icon"></i>
+            <i class="bi bi-search me-3 section-icon"></i>
             <div>
-                <h3 class="section-title mb-1">Global Debug Insights</h3>
-                <p class="text-muted mb-0">Explore insights extracted from debug data across all conversations</p>
+                <h3 class="section-title mb-1">Conversation Debug Analysis</h3>
+                <p class="text-muted mb-0">Examine detailed debug data for individual conversations</p>
             </div>
         </div>
     </div>
     
-    <!-- Stats Summary Cards -->
+    <!-- Main Debug Analysis Interface -->
+    <div class="dashboard-card">
+        <div class="card-header">
+            <h3><i class="bi bi-bug me-2"></i>Conversation Debug Inspector</h3>
+        </div>
+        <div class="card-body p-0">
+            <div class="debug-conversation-grid" style="min-height: 800px; height: auto;">
+                <!-- Conversation Selection Sidebar -->
+                <div class="debug-sidebar" style="min-height: 800px;">
+                    <div class="dashboard-card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h3 class="m-0"><i class="bi bi-chat-text me-2"></i>Select Conversation</h3>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="debug-auto-refresh">
+                                <label class="form-check-label small" for="debug-auto-refresh">Auto-refresh</label>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="input-group p-2">
+                                <input type="text" class="form-control form-control-sm" placeholder="Search conversations..." id="debug-conversation-search">
+                                <button class="btn btn-sm btn-outline-secondary" type="button" id="debug-search-btn">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                            </div>
+                            <div class="list-group list-group-flush" id="debug-conversation-list" style="max-height: 700px; overflow-y: auto;">
+                                <!-- Conversations will be added here by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Debug Content Area -->
+                <div class="debug-content" style="min-height: 800px;">
+                    <!-- Conversation Details Panel (hidden by default) -->
+                    <div class="dashboard-card h-100" id="debug-conversation-details" style="display: none;">
+                        <!-- Conversation details will be added here by JS -->
+                    </div>
+                    
+                    <!-- Placeholder when no conversation is selected -->
+                    <div class="dashboard-card h-100" id="debug-no-conversation-placeholder">
+                        <div class="card-body d-flex flex-column align-items-center justify-content-center text-center text-muted">
+                            <i class="bi bi-search mb-3 placeholder-icon"></i>
+                            <h5>Select a conversation to view debug analysis</h5>
+                            <p>Detailed debugging information will appear here</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Cross-Conversation Analysis Tables -->
     <div class="dashboard-row">
-        <div class="metrics-grid">
-            <div class="metrics-card">
-                <div class="metrics-card-header">
-                    <span class="metrics-card-title">CATEGORIES</span>
-                    <span class="metrics-card-icon">
-                        <i class="bi bi-tags"></i>
-                    </span>
-                </div>
-                <div class="metrics-card-value" id="debug-category-count">0</div>
-                <div class="metrics-card-label">Unique categories identified</div>
-            </div>
-            <div class="metrics-card">
-                <div class="metrics-card-header">
-                    <span class="metrics-card-title">CONCEPTS</span>
-                    <span class="metrics-card-icon">
-                        <i class="bi bi-grid-3x3"></i>
-                    </span>
-                </div>
-                <div class="metrics-card-value" id="debug-concept-count">0</div>
-                <div class="metrics-card-label">Unique concepts extracted</div>
-            </div>
-            <div class="metrics-card">
-                <div class="metrics-card-header">
-                    <span class="metrics-card-title">RESTAURANTS</span>
-                    <span class="metrics-card-icon">
-                        <i class="bi bi-cup-hot"></i>
-                    </span>
-                </div>
-                <div class="metrics-card-value" id="debug-restaurant-count">0</div>
-                <div class="metrics-card-label">Unique restaurants mentioned</div>
-            </div>
-            <div class="metrics-card">
-                <div class="metrics-card-header">
-                    <span class="metrics-card-title">ASSOCIATIONS</span>
-                    <span class="metrics-card-icon">
-                        <i class="bi bi-rocket"></i>
-                    </span>
-                </div>
-                <div class="metrics-card-value" id="debug-association-count">0</div>
-                <div class="metrics-card-label">Total concept-restaurant links</div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Category and Concept Analysis -->
-    <div class="dashboard-row two-column">
         <div class="dashboard-card">
-            <div class="card-header">
-                <h3><i class="bi bi-tags me-2"></i>Top Categories</h3>
-            </div>
-            <div class="card-body">
-                <div class="chart-container">
-                    <canvas id="category-distribution-chart"></canvas>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3><i class="bi bi-diagram-3 me-2"></i>Concept-Restaurant Associations</h3>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="debug-toggle-table-view">
+                        <i class="bi bi-table me-1"></i>Toggle View
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="debug-refresh-associations">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh Data
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="bi bi-funnel me-1"></i>Filter
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" data-filter="all">All Associations</a></li>
+                        <li><a class="dropdown-item" href="#" data-filter="food">Food Categories</a></li>
+                        <li><a class="dropdown-item" href="#" data-filter="ambiance">Ambiance Categories</a></li>
+                        <li><a class="dropdown-item" href="#" data-filter="service">Service Categories</a></li>
+                    </ul>
                 </div>
-            </div>
-        </div>
-        <div class="dashboard-card">
-            <div class="card-header">
-                <h3><i class="bi bi-grid-3x3 me-2"></i>Top Concepts</h3>
-            </div>
-            <div class="card-body">
-                <div class="chart-container">
-                    <canvas id="concept-distribution-chart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Restaurant Analysis Section -->
-    <div class="dashboard-row two-column">
-        <div class="dashboard-card">
-            <div class="card-header">
-                <h3><i class="bi bi-cup-hot me-2"></i>Top Restaurants</h3>
-            </div>
-            <div class="card-body">
-                <div class="chart-container">
-                    <canvas id="restaurant-distribution-chart"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="dashboard-card">
-            <div class="card-header">
-                <h3><i class="bi bi-tags me-2"></i>Categories & Their Top Restaurants</h3>
-            </div>
-            <div class="card-body">
-                <div class="accordion" id="categoryRestaurantAccordion">
-                    <!-- Category-restaurant items will be added here -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Network & Relationship Section -->
-    <div class="dashboard-row two-column">
-        <div class="dashboard-card">
-            <div class="card-header">
-                <h3><i class="bi bi-graph-up me-2"></i>Top Concept-Restaurant Associations</h3>
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <!-- Loading indicator -->
+                <div id="concept-restaurant-loading" class="text-center p-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading association data...</span>
+                    </div>
+                    <p class="mt-2">Loading concept-restaurant associations...</p>
+                </div>
+                
+                <!-- Error message placeholder -->
+                <div id="concept-restaurant-error" class="alert alert-warning m-3 d-none">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <span id="concept-restaurant-error-message">No association data available</span>
+                </div>
+                
+                <!-- Table View (Default) -->
+                <div class="table-responsive d-none" id="concept-restaurant-table-view">
                     <table class="table table-hover" id="concept-restaurant-table">
                         <thead class="table-light">
                             <tr>
@@ -126,53 +116,161 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- Associations will be added here -->
+                            <!-- Table content will be populated by JS -->
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Conversation-level Debug Analysis section -->
-    <div class="section-header mt-4">
-        <div class="d-flex align-items-center">
-            <i class="bi bi-chat-right-text me-3 section-icon"></i>
-            <div>
-                <h3 class="section-title mb-1">Conversation-level Debug Analysis</h3>
-                <p class="text-muted mb-0">Select a conversation to view its debug analysis</p>
-            </div>
-        </div>
-    </div>
-    
-    <div class="dashboard-row">
-        <div class="debug-conversation-grid">
-            <div class="debug-sidebar">
-                <div class="dashboard-card h-100">
-                    <div class="card-header">
-                        <h3><i class="bi bi-list-ul me-2"></i>Select Conversation</h3>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="list-group list-group-flush" id="debug-conversation-list">
-                            <!-- Conversations will be added here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="debug-content">
-                <div class="dashboard-card d-none h-100" id="debug-conversation-details">
-                    <!-- Conversation details will be added here -->
+                
+                <!-- Accordion View (Hidden by Default) -->
+                <div class="accordion d-none" id="categoryRestaurantAccordion">
+                    <!-- Accordion items will be populated by JS -->
                 </div>
                 
-                <!-- Placeholder when no conversation is selected -->
-                <div class="dashboard-card h-100" id="debug-no-conversation-placeholder">
-                    <div class="card-body d-flex flex-column align-items-center justify-content-center text-center text-muted">
-                        <i class="bi bi-bug mb-3 placeholder-icon"></i>
-                        <h5>Select a conversation to view debug analysis</h5>
-                        <p>Debug details will appear here</p>
-                    </div>
+                <!-- Empty state message -->
+                <div id="no-associations-message" class="alert alert-info m-3 d-none">
+                    <i class="bi bi-info-circle me-2"></i>No concept-restaurant associations found. This could mean the debug data doesn't contain association information.
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    /* Custom styles for debug insights layout */
+    .debug-conversation-grid {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 20px;
+    }
+    
+    .debug-content #debug-conversation-details {
+        overflow-y: auto;
+        max-height: none;
+    }
+    
+    .debug-content #debug-conversation-details .card-body {
+        overflow-y: auto;
+        padding: 20px;
+    }
+    
+    @media (max-width: 992px) {
+        .debug-conversation-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .debug-sidebar {
+            min-height: auto !important;
+            max-height: 400px;
+        }
+    }
+</style>
+
+<script>
+    // Add interactive features to the debug insights UI
+    document.addEventListener('DOMContentLoaded', function() {
+        // Fix for debug-conversation-details visibility
+        const detailsPanel = document.getElementById('debug-conversation-details');
+        if (detailsPanel) {
+            // Use classList instead of style.display for consistency with JS code
+            detailsPanel.classList.add('d-none');
+            detailsPanel.style.display = '';
+        }
+        
+        // Search functionality for the debug conversation list
+        const searchInput = document.getElementById('debug-conversation-search');
+        const searchBtn = document.getElementById('debug-search-btn');
+        
+        if (searchInput && searchBtn) {
+            // Search on input changes
+            searchInput.addEventListener('input', filterConversations);
+            
+            // Search on button click
+            searchBtn.addEventListener('click', function() {
+                filterConversations();
+            });
+            
+            // Search on Enter key press
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    filterConversations();
+                }
+            });
+        }
+        
+        // Toggle between table and accordion views
+        const toggleViewBtn = document.getElementById('debug-toggle-table-view');
+        const tableView = document.getElementById('concept-restaurant-table-view');
+        const accordionView = document.getElementById('categoryRestaurantAccordion');
+        
+        if (toggleViewBtn && tableView && accordionView) {
+            toggleViewBtn.addEventListener('click', function() {
+                tableView.classList.toggle('d-none');
+                accordionView.classList.toggle('d-none');
+                
+                // Update button icon and text
+                const icon = this.querySelector('i');
+                if (tableView.classList.contains('d-none')) {
+                    icon.className = 'bi bi-list me-1';
+                    this.innerHTML = '<i class="bi bi-list me-1"></i>List View';
+                } else {
+                    icon.className = 'bi bi-table me-1';
+                    this.innerHTML = '<i class="bi bi-table me-1"></i>Table View';
+                }
+            });
+        }
+        
+        // Refresh associations data button
+        const refreshBtn = document.getElementById('debug-refresh-associations');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', function() {
+                // Show loading indicator
+                document.getElementById('concept-restaurant-loading').classList.remove('d-none');
+                document.getElementById('concept-restaurant-table-view').classList.add('d-none');
+                document.getElementById('categoryRestaurantAccordion').classList.add('d-none');
+                document.getElementById('no-associations-message').classList.add('d-none');
+                document.getElementById('concept-restaurant-error').classList.add('d-none');
+                
+                // Trigger refresh of debug insights data via custom event
+                const event = new CustomEvent('debugInsights:refreshAssociations');
+                document.dispatchEvent(event);
+            });
+        }
+        
+        // Function to filter conversations
+        function filterConversations() {
+            if (!searchInput) return;
+            
+            const searchTerm = searchInput.value.toLowerCase();
+            const conversations = document.querySelectorAll('#debug-conversation-list a');
+            
+            let hasVisibleItems = false;
+            
+            conversations.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    item.style.display = '';
+                    hasVisibleItems = true;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            // Display a message if no matches found
+            const noMatchesMsg = document.getElementById('no-matches-message');
+            if (!hasVisibleItems) {
+                if (!noMatchesMsg) {
+                    const msg = document.createElement('div');
+                    msg.id = 'no-matches-message';
+                    msg.className = 'list-group-item text-center text-muted';
+                    msg.innerHTML = '<i class="bi bi-search me-2"></i>No matching conversations';
+                    const listContainer = document.getElementById('debug-conversation-list');
+                    if (listContainer) {
+                        listContainer.appendChild(msg);
+                    }
+                }
+            } else if (noMatchesMsg) {
+                noMatchesMsg.remove();
+            }
+        }
+    });
+</script>

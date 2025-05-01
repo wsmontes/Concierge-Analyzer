@@ -31,6 +31,23 @@ if (typeof window.DebugInsightsModule === 'undefined') {
         console.log("Initializing debug insights with data:", data ? "Data available" : "No data");
         
         // Fetch debug analysis data
+        fetchDebugAnalysisData();
+        
+        // Setup conversation list for debug analysis
+        setupDebugConversationList(data);
+        
+        // Set up section visibility listener
+        initSectionVisibilityObserver();
+        
+        // Listen for refresh events
+        document.addEventListener('debugInsights:refreshAssociations', function() {
+            console.log("Refresh associations event received");
+            fetchDebugAnalysisData();
+        });
+    }
+    
+    // Extract the fetch logic to a separate function for reuse
+    function fetchDebugAnalysisData() {
         fetch(`${CONFIG.API_URL}/debug_analysis`)
             .then(response => {
                 if (!response.ok) throw new Error('Failed to load debug analysis');
@@ -41,22 +58,19 @@ if (typeof window.DebugInsightsModule === 'undefined') {
                 
                 // Store data for deferred rendering
                 globalInsightsData = debugData.global_insights || [];
-                crossConversationData = debugData.cross_conversation_insights || {};
+                crossConversationData = debugData.cross_insights || {};
                 
                 // Log the structure of the insights data
                 console.log("Global insights data structure:", 
-                            globalInsightsData.length > 0 ? 
-                            "Array with " + globalInsightsData.length + " items" : 
-                            "Empty or invalid array");
+                          globalInsightsData.length > 0 ? 
+                          "Array with " + globalInsightsData.length + " items" : 
+                          "Empty or invalid array");
                 
                 // Update stats immediately (these don't need canvas elements)
                 updateDebugStats(globalInsightsData);
                 
-                // Setup conversation list for debug analysis
-                setupDebugConversationList(data);
-                
-                // Set up section visibility listener
-                initSectionVisibilityObserver();
+                // Render cross-conversation insights immediately
+                displayCrossConversationInsights(crossConversationData);
             })
             .catch(error => {
                 console.error('Error loading debug analysis:', error);
@@ -610,15 +624,50 @@ if (typeof window.DebugInsightsModule === 'undefined') {
     // Display cross-conversation insights with element checks
     function displayCrossConversationInsights(crossInsights) {
         try {
+            // Hide loading indicator and show appropriate content based on data
+            const loadingIndicator = document.getElementById('concept-restaurant-loading');
+            const errorMessage = document.getElementById('concept-restaurant-error');
+            const tableView = document.getElementById('concept-restaurant-table-view');
+            const accordionView = document.getElementById('categoryRestaurantAccordion');
+            const noDataMessage = document.getElementById('no-associations-message');
+            
+            if (loadingIndicator) loadingIndicator.classList.add('d-none');
+            
             if (!crossInsights) {
                 console.warn("No cross-conversation insights data available");
+                if (errorMessage) {
+                    errorMessage.classList.remove('d-none');
+                    const errMsgElement = document.getElementById('concept-restaurant-error-message');
+                    if (errMsgElement) {
+                        errMsgElement.textContent = "No cross-conversation data available from server";
+                    }
+                }
                 return;
             }
             
-            displayConceptRestaurantAssociations(crossInsights);
-            displayCategoryRestaurantAccordion(crossInsights);
+            // Display concept-restaurant associations
+            const hasTableData = displayConceptRestaurantAssociations(crossInsights);
+            const hasAccordionData = displayCategoryRestaurantAccordion(crossInsights);
+            
+            // Show either table view or no data message based on results
+            if (tableView && !tableView.classList.contains('d-none')) {
+                tableView.classList.remove('d-none');
+            }
+            
+            // Show no data message if both displays have no data
+            if (!hasTableData && !hasAccordionData && noDataMessage) {
+                noDataMessage.classList.remove('d-none');
+            }
         } catch (error) {
             console.error("Error displaying cross-conversation insights:", error);
+            const errorMessage = document.getElementById('concept-restaurant-error');
+            if (errorMessage) {
+                errorMessage.classList.remove('d-none');
+                const errMsgElement = document.getElementById('concept-restaurant-error-message');
+                if (errMsgElement) {
+                    errMsgElement.textContent = "Error displaying association data: " + error.message;
+                }
+            }
         }
     }
 
@@ -919,57 +968,63 @@ if (typeof window.DebugInsightsModule === 'undefined') {
 
     // Display concept-restaurant associations table with element check
     function displayConceptRestaurantAssociations(crossInsights) {
-        if (!crossInsights) return;
+        if (!crossInsights) return false;
         
         const tableBody = document.querySelector('#concept-restaurant-table tbody');
         if (!tableBody) {
             console.warn("Concept-restaurant table body element not found");
-            return;
+            return false;
         }
         
         tableBody.innerHTML = '';
         
         if (crossInsights.concept_restaurant_associations && 
-            Array.isArray(crossInsights.concept_restaurant_associations)) {
+            Array.isArray(crossInsights.concept_restaurant_associations) &&
+            crossInsights.concept_restaurant_associations.length > 0) {
+            
+            console.log(`Displaying ${crossInsights.concept_restaurant_associations.length} concept-restaurant associations`);
             
             crossInsights.concept_restaurant_associations.forEach(association => {
                 const row = document.createElement('tr');
                 
                 const categoryCell = document.createElement('td');
-                categoryCell.textContent = association.category;
+                categoryCell.textContent = association.category || "Unknown Category";
                 row.appendChild(categoryCell);
                 
                 const conceptCell = document.createElement('td');
-                conceptCell.textContent = association.concept;
+                conceptCell.textContent = association.concept || "Unknown Concept";
                 row.appendChild(conceptCell);
                 
                 const restaurantCell = document.createElement('td');
-                restaurantCell.textContent = association.restaurant;
+                restaurantCell.textContent = association.restaurant || "Unknown Restaurant";
                 row.appendChild(restaurantCell);
                 
                 const countCell = document.createElement('td');
-                countCell.textContent = association.count;
+                countCell.textContent = association.count || 0;
                 row.appendChild(countCell);
                 
                 tableBody.appendChild(row);
             });
+            return true;
         }
+        return false;
     }
 
     // Display category-restaurant accordion with element check
     function displayCategoryRestaurantAccordion(crossInsights) {
-        if (!crossInsights) return;
+        if (!crossInsights) return false;
         
         const accordion = document.getElementById('categoryRestaurantAccordion');
         if (!accordion) {
             console.warn("Category-restaurant accordion element not found");
-            return;
+            return false;
         }
         
         accordion.innerHTML = '';
         
         if (crossInsights.category_restaurant_associations && 
-            Array.isArray(crossInsights.category_restaurant_associations)) {
+            Array.isArray(crossInsights.category_restaurant_associations) && 
+            crossInsights.category_restaurant_associations.length > 0) {
             
             console.log(`Displaying ${crossInsights.category_restaurant_associations.length} category-restaurant associations`);
             
@@ -984,19 +1039,19 @@ if (typeof window.DebugInsightsModule === 'undefined') {
                     <h2 class="accordion-header" id="${headerId}">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
                             data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
-                            ${category.category} (${category.top_restaurants.length} restaurants)
+                            ${category.category || "Unknown Category"} (${category.top_restaurants?.length || 0} restaurants)
                         </button>
                     </h2>
                     <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}"
                         data-bs-parent="#categoryRestaurantAccordion">
                         <div class="accordion-body p-0">
                             <ul class="list-group list-group-flush">
-                                ${category.top_restaurants.map(r => 
+                                ${category.top_restaurants ? category.top_restaurants.map(r => 
                                     `<li class="list-group-item d-flex justify-content-between align-items-center">
-                                        ${r.name}
-                                        <span class="badge bg-primary rounded-pill">${r.count}</span>
+                                        ${r.name || "Unknown"}
+                                        <span class="badge bg-primary rounded-pill">${r.count || 0}</span>
                                      </li>`
-                                ).join('')}
+                                ).join('') : '<li class="list-group-item">No restaurant data available</li>'}
                             </ul>
                         </div>
                     </div>
@@ -1004,9 +1059,10 @@ if (typeof window.DebugInsightsModule === 'undefined') {
                 
                 accordion.appendChild(accordionItem);
             });
+            return true;
         } else {
             console.warn("No category-restaurant associations data available or invalid format");
-            accordion.innerHTML = '<div class="alert alert-info m-3">No category-restaurant associations available</div>';
+            return false;
         }
     }
 

@@ -130,6 +130,10 @@ function initializeSectionNavigation() {
                 // Remember the active section
                 currentActiveSection = targetSectionId;
                 
+                // Update page title
+                document.getElementById('current-section-title').textContent = 
+                    this.querySelector('a').textContent.trim();
+                
                 // Trigger section-specific initialization
                 triggerSectionInit(targetSectionId);
                 

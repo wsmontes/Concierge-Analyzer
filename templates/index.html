@@ -39,11 +39,8 @@
                 <li class="menu-item active" data-target="dashboard-section">
                     <a href="#dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
                 </li>
-                <li class="menu-item" data-target="personas-section">
-                    <a href="#personas"><i class="bi bi-people"></i> Persona Analysis</a>
-                </li>
                 <li class="menu-item" data-target="recommendations-section">
-                    <a href="#recommendations"><i class="bi bi-bar-chart-fill"></i> Recommendations</a>
+                    <a href="#recommendations"><i class="bi bi-table"></i> Recommendations Table</a>
                 </li>
                 <li class="menu-item" data-target="conversations-section">
                     <a href="#conversations"><i class="bi bi-chat"></i> Conversations</a>
@@ -216,19 +213,193 @@
                                     </div>
                                 </div>
                             </div>
+                            
+                            <!-- Added Persona Analysis Cards -->
+                            <div class="dashboard-row two-column">
+                                <div class="dashboard-card">
+                                    <div class="card-header">
+                                        <h3><i class="bi bi-people me-2"></i>Recommendation Accuracy</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="chart-container">
+                                            <canvas id="accuracy-chart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Removed duplicate accuracy distribution card since we already have one -->
+                                <div class="dashboard-card">
+                                    <div class="card-header">
+                                        <h3><i class="bi bi-bar-chart-line me-2"></i>Recommendation Count</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="chart-container">
+                                            <canvas id="recommendation-count-chart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Metrics Distribution - Moved from Recommendations -->
+                            <div class="dashboard-row two-column">
+                                <div class="dashboard-card">
+                                    <div class="card-header">
+                                        <h3><i class="bi bi-graph-up-arrow me-2"></i>Metrics Distribution</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="chart-container">
+                                            <canvas id="metrics-distribution-chart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Recommendation Statistics - Moved from Recommendations -->
+                                <div class="dashboard-card metrics-overview">
+                                    <div class="card-header">
+                                        <h3><i class="bi bi-pie-chart me-2"></i>Recommendation Statistics</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="metrics-grid">
+                                            <div class="metrics-item">
+                                                <div class="metrics-label">Precision</div>
+                                                <div class="progress mb-2">
+                                                    <div id="rec-avg-precision-bar" class="progress-bar bg-primary" role="progressbar" style="width: 0%;">0%</div>
+                                                </div>
+                                            </div>
+                                            <div class="metrics-item">
+                                                <div class="metrics-label">Recall</div>
+                                                <div class="progress mb-2">
+                                                    <div id="rec-avg-recall-bar" class="progress-bar bg-success" role="progressbar" style="width: 0%;">0%</div>
+                                                </div>
+                                            </div>
+                                            <div class="metrics-item">
+                                                <div class="metrics-label">Accuracy</div>
+                                                <div class="progress mb-2">
+                                                    <div id="rec-avg-accuracy-bar" class="progress-bar bg-info" role="progressbar" style="width: 0%;">0%</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Debug Insights Cards - Moved from Debug Section -->
+                            <div class="dashboard-row two-column">
+                                <div class="dashboard-card">
+                                    <div class="card-header">
+                                        <h3><i class="bi bi-tags me-2"></i>Top Categories</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="chart-container">
+                                            <canvas id="category-distribution-chart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="dashboard-card">
+                                    <div class="card-header">
+                                        <h3><i class="bi bi-grid-3x3 me-2"></i>Top Concepts</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="chart-container">
+                                            <canvas id="concept-distribution-chart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="dashboard-row two-column">
+                                <div class="dashboard-card">
+                                    <div class="card-header">
+                                        <h3><i class="bi bi-cup-hot me-2"></i>Top Restaurants</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="chart-container">
+                                            <canvas id="restaurant-distribution-chart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="dashboard-card">
+                                    <div class="card-header">
+                                        <h3><i class="bi bi-grid me-2"></i>Debug Metrics</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="metrics-grid">
+                                            <div class="metrics-card">
+                                                <div class="metrics-card-header">
+                                                    <span class="metrics-card-title">CATEGORIES</span>
+                                                    <span class="metrics-card-icon">
+                                                        <i class="bi bi-tags"></i>
+                                                    </span>
+                                                </div>
+                                                <div class="metrics-card-value" id="debug-category-count">0</div>
+                                                <div class="metrics-card-label">Unique categories identified</div>
+                                            </div>
+                                            <div class="metrics-card">
+                                                <div class="metrics-card-header">
+                                                    <span class="metrics-card-title">CONCEPTS</span>
+                                                    <span class="metrics-card-icon">
+                                                        <i class="bi bi-grid-3x3"></i>
+                                                    </span>
+                                                </div>
+                                                <div class="metrics-card-value" id="debug-concept-count">0</div>
+                                                <div class="metrics-card-label">Unique concepts extracted</div>
+                                            </div>
+                                            <div class="metrics-card">
+                                                <div class="metrics-card-header">
+                                                    <span class="metrics-card-title">RESTAURANTS</span>
+                                                    <span class="metrics-card-icon">
+                                                        <i class="bi bi-cup-hot"></i>
+                                                    </span>
+                                                </div>
+                                                <div class="metrics-card-value" id="debug-restaurant-count">0</div>
+                                                <div class="metrics-card-label">Unique restaurants mentioned</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </section>
                     
-                    <!-- Personas Section -->
-                    <section id="personas-section" class="content-section">
-                        <!-- This will be filled with the content from personas.html -->
-                        {% include 'partials/tabs/personas.html' %}
-                    </section>
-                    
-                    <!-- Recommendations Section -->
+                    <!-- Recommendations Section - Now only contains the comparison table -->
                     <section id="recommendations-section" class="content-section">
-                        <!-- This will be filled with the content from recommendations.html -->
-                        {% include 'partials/tabs/recommendations.html' %}
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <h3><i class="bi bi-table me-2"></i>Detailed Recommendations Comparison</h3>
+                                <div class="card-actions">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                            <i class="bi bi-funnel me-1"></i>Filter
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item" href="#" data-filter="all">All Records</a></li>
+                                            <li><a class="dropdown-item" href="#" data-filter="high">High Accuracy ≥75%</a></li>
+                                            <li><a class="dropdown-item" href="#" data-filter="medium">Medium Accuracy 50-74%</a></li>
+                                            <li><a class="dropdown-item" href="#" data-filter="low">Low Accuracy <50%</a></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table id="recommendations-comparison-table" class="table table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Conv.</th>
+                                                <th>Persona</th>
+                                                <th>Request</th>
+                                                <th>Expected</th>
+                                                <th>Actual</th>
+                                                <th>Score</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Table rows will be added here by JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
                     </section>
                     
                     <!-- Conversations Section -->
