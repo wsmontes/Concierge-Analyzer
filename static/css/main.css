@@ -490,6 +490,20 @@ body {
 /* Upload Form Styling */
 .upload-section {
     margin-bottom: 20px;
+    transition: opacity 0.3s ease, height 0.3s ease, visibility 0.3s;
+    display: block; /* Visible by default */
+    opacity: 1;
+    visibility: visible;
+}
+
+.upload-section.hidden {
+    display: none;
+    height: 0;
+    opacity: 0;
+    visibility: hidden;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
 }
 
 .upload-area {
@@ -565,6 +579,103 @@ body {
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
 }
 
+/* Sidebar Upload Component */
+.sidebar-upload {
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+    display: none; /* Hidden by default */
+    transition: opacity 0.3s ease, height 0.3s ease;
+    opacity: 0;
+}
+
+.sidebar-upload.active {
+    display: block;
+    opacity: 1;
+    animation: fadeIn 0.3s forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.sidebar-upload-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--sidebar-text);
+    display: flex;
+    align-items: center;
+}
+
+.sidebar-upload-title i {
+    margin-right: 5px;
+}
+
+.sidebar-upload-area {
+    position: relative;
+    border: 1px dashed var(--border-color);
+    border-radius: 6px;
+    padding: 12px 8px;
+    text-align: center;
+    background-color: var(--sidebar-bg);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    margin-bottom: 10px;
+}
+
+.sidebar-upload-area:hover, .sidebar-upload-area.dragover {
+    background-color: var(--sidebar-item-hover);
+    border-color: var(--bs-primary);
+}
+
+.sidebar-upload-area.error {
+    border-color: var(--bs-danger);
+    background-color: rgba(232, 62, 140, 0.05);
+}
+
+.sidebar-upload-placeholder {
+    color: var(--sidebar-text);
+    font-size: 0.85rem;
+}
+
+.sidebar-upload-placeholder i {
+    font-size: 1.5rem;
+    color: var(--sidebar-text);
+    margin-bottom: 5px;
+    display: block;
+}
+
+.sidebar-selected-file {
+    display: flex;
+    align-items: center;
+    padding: 5px 8px;
+    background-color: var(--sidebar-item-hover);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-bottom: 10px;
+}
+
+.sidebar-selected-file i {
+    font-size: 1rem;
+    color: var(--bs-primary);
+    margin-right: 5px;
+}
+
+.sidebar-file-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+}
+
+.sidebar-upload-btn {
+    width: 100%;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
 /* Responsive Layout */
 @media (max-width: 992px) {
     .sidebar {
@@ -586,6 +697,18 @@ body {
     
     .dashboard-row.two-column {
         flex-direction: column;
+    }
+
+    .sidebar-upload {
+        padding: 10px;
+    }
+    
+    .sidebar-upload-area {
+        padding: 10px 6px;
+    }
+    
+    .sidebar-upload-btn {
+        padding: 4px 8px;
     }
 }
 

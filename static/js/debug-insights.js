@@ -633,43 +633,65 @@ if (typeof window.DebugInsightsModule === 'undefined') {
         debugConversationList.innerHTML = ''; // Clear existing items
         
         // Check if we have the conversations data
-        if (!data || (!data.conversations && !data.metrics)) {
-            console.warn("No conversation data available for debug analysis");
-            debugConversationList.innerHTML = '<div class="list-group-item text-muted">No conversations with debug data available</div>';
+        if (!data) {
+            console.warn("No data available for debug analysis");
+            debugConversationList.innerHTML = '<div class="list-group-item text-muted">No conversation data available</div>';
             return;
         }
         
-        // Use metrics data to create list items since full conversations might not be available
+        // Use metrics data if available, otherwise use conversations
         const metrics = data.metrics || [];
+        const conversations = data.conversations || [];
         
-        if (metrics.length === 0) {
-            debugConversationList.innerHTML = '<div class="list-group-item text-muted">No conversations with metrics data available</div>';
+        // Determine which data source to use and how many items we have
+        const useMetrics = metrics.length > 0;
+        const itemCount = useMetrics ? metrics.length : conversations.length;
+        
+        if (itemCount === 0) {
+            debugConversationList.innerHTML = '<div class="list-group-item text-muted">No conversations with data available</div>';
             return;
         }
         
-        console.log(`Setting up debug conversation list with ${metrics.length} conversations`);
+        console.log(`Setting up debug conversation list with ${itemCount} conversations`);
         
-        for (let i = 0; i < metrics.length; i++) {
-            const metric = metrics[i];
+        // Create list items for each conversation
+        for (let i = 0; i < itemCount; i++) {
+            // Get data based on source
+            const sourceData = useMetrics ? metrics[i] : conversations[i];
             
-            // Create list item for all conversations - we'll fetch debug data on demand
+            // Create list item for conversation
             const listItem = document.createElement('a');
             listItem.href = '#';
             listItem.className = 'list-group-item list-group-item-action';
             listItem.dataset.conversationId = i;
             
-            const requestText = metric.request || 'No request';
+            // Get the request text from the appropriate source
+            let requestText = 'No request';
+            
+            if (useMetrics) {
+                requestText = sourceData.request || 'No request';
+            } else {
+                // Try to find user request in conversation messages
+                const userMsg = sourceData.find(msg => msg.type === 'user_request');
+                if (userMsg) {
+                    requestText = userMsg.content;
+                }
+            }
+            
             const truncatedRequest = requestText.length > 60 ? requestText.substring(0, 60) + '...' : requestText;
             
             listItem.innerHTML = `
                 <div class="d-flex w-100 justify-content-between">
                     <h6 class="mb-1">Conversation ${i + 1}</h6>
+                    <small class="text-muted">${sourceData.timestamp ? new Date(sourceData.timestamp).toLocaleDateString() : ''}</small>
                 </div>
                 <p class="mb-1 text-truncate">${truncatedRequest}</p>
             `;
             
             listItem.addEventListener('click', function(e) {
                 e.preventDefault();
+                
+                // Show loading message in debug panel
                 loadDebugConversationAnalysis(i);
                 
                 // Set active state
@@ -681,6 +703,11 @@ if (typeof window.DebugInsightsModule === 'undefined') {
             
             debugConversationList.appendChild(listItem);
         }
+        
+        // Auto-select first conversation if available
+        if (itemCount > 0 && debugConversationList.firstElementChild) {
+            debugConversationList.firstElementChild.click();
+        }
     }
 
     // Load debug analysis for a specific conversation
@@ -690,8 +717,11 @@ if (typeof window.DebugInsightsModule === 'undefined') {
         if (detailsPanel) {
             detailsPanel.classList.remove('d-none');
             detailsPanel.innerHTML = `
+                <div class="card-header">
+                    <div id="debug-conversation-title">Loading Conversation ${conversationId + 1} Analysis...</div>
+                </div>
                 <div class="card-body text-center">
-                    <div class="spinner-border text-primary" role="status">
+                    <div class="spinner-border text-primary my-5" role="status">
                         <span class="visually-hidden">Loading debug data...</span>
                     </div>
                     <p class="mt-2">Loading debug analysis for conversation ${conversationId + 1}...</p>
@@ -707,7 +737,11 @@ if (typeof window.DebugInsightsModule === 'undefined') {
         
         fetch(`${CONFIG.API_URL}/debug_analysis/${conversationId}`)
             .then(response => {
-                if (!response.ok) throw new Error('Failed to load conversation debug analysis');
+                if (!response.ok) {
+                    throw new Error(response.status === 404 ? 
+                        'Debug analysis not found for this conversation' : 
+                        'Failed to load conversation debug analysis');
+                }
                 return response.json();
             })
             .then(analysis => {
@@ -719,10 +753,14 @@ if (typeof window.DebugInsightsModule === 'undefined') {
                 // Show error in the details panel
                 if (detailsPanel) {
                     detailsPanel.innerHTML = `
+                        <div class="card-header">
+                            <div id="debug-conversation-title">Conversation ${conversationId + 1} Analysis</div>
+                        </div>
                         <div class="card-body">
                             <div class="alert alert-danger">
                                 <h5><i class="bi bi-exclamation-triangle me-2"></i>Error Loading Debug Data</h5>
                                 <p>${error.message}</p>
+                                <p>Try refreshing the page or check server logs for details.</p>
                             </div>
                         </div>
                     `;
@@ -749,6 +787,9 @@ if (typeof window.DebugInsightsModule === 'undefined') {
         // Check if we have an error
         if (analysis.error) {
             detailsPanel.innerHTML = `
+                <div class="card-header">
+                    <div id="debug-conversation-title">Conversation ${analysis.conversation_id + 1} Analysis</div>
+                </div>
                 <div class="card-body">
                     <div class="alert alert-warning">
                         <i class="bi bi-exclamation-triangle me-2"></i>${analysis.error}
@@ -762,6 +803,9 @@ if (typeof window.DebugInsightsModule === 'undefined') {
         let detailsHtml = `
             <div class="card-header d-flex justify-content-between align-items-center">
                 <div id="debug-conversation-title">Conversation ${analysis.conversation_id + 1} Debug Analysis</div>
+                <div>
+                    <span class="badge bg-info">${analysis.debug_count} debug logs</span>
+                </div>
             </div>
             <div class="card-body">
         `;
@@ -773,6 +817,37 @@ if (typeof window.DebugInsightsModule === 'undefined') {
                 <p class="mb-0">${analysis.request || 'No request available'}</p>
             </div>
         `;
+        
+        // Add concepts evolution visualization if available
+        if (analysis.concept_evolution && analysis.concept_evolution.metadata && analysis.concept_evolution.metadata.length > 0) {
+            detailsHtml += `
+                <h5 class="mt-4 mb-3">Initial Concepts</h5>
+                <div class="table-responsive mb-4">
+                    <table class="table table-sm table-hover debug-concept-table">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            analysis.concept_evolution.metadata.forEach(concept => {
+                detailsHtml += `
+                    <tr>
+                        <td>${concept.category}</td>
+                        <td>${concept.value}</td>
+                    </tr>
+                `;
+            });
+            
+            detailsHtml += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
         
         // Add insights sections if available
         if (analysis.insights && analysis.insights.length > 0) {
@@ -792,8 +867,34 @@ if (typeof window.DebugInsightsModule === 'undefined') {
                             <div class="card-body">
                                 <p class="text-muted">${insight.description}</p>
                                 <div class="debug-insight-data" id="insight-${insight.type}">
-                                    <!-- Insight data would be added here dynamically -->
-                                    <pre class="debug-content">${JSON.stringify(insight.data, null, 2)}</pre>
+                `;
+                
+                // Format data based on insight type
+                if (insight.type === 'metadata_summary' && insight.data.top_categories) {
+                    detailsHtml += `
+                        <div class="debug-stats-grid mb-3">
+                            ${insight.data.top_categories.map(cat => 
+                                `<div class="debug-stat-item">
+                                    <div class="badge bg-primary">${cat[1]}</div>
+                                    <div class="text-truncate">${cat[0]}</div>
+                                 </div>`).join('')}
+                        </div>
+                    `;
+                } else if (insight.type === 'top_candidates' && insight.data.top_candidates) {
+                    detailsHtml += `
+                        <div class="list-group">
+                            ${insight.data.top_candidates.map(cand => 
+                                `<div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>${cand.name}</div>
+                                    <span class="badge bg-success rounded-pill">${cand.score.toFixed(2)}</span>
+                                 </div>`).join('')}
+                        </div>
+                    `;
+                } else {
+                    detailsHtml += `<pre class="debug-content">${JSON.stringify(insight.data, null, 2)}</pre>`;
+                }
+                
+                detailsHtml += `
                                 </div>
                             </div>
                         </div>
