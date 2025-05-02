@@ -213,8 +213,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // If we have embeddings data loaded, integrate it with the conversation data
         if (window.embeddingsData && window.embeddingsData.loaded) {
             console.log('Integrating embeddings data with conversation analysis');
-            // This is where you would use the embeddings data for enhanced analysis
-            // For now, we just log it's available
+            // Update embeddings visualizations if the module is available
+            if (window.EmbeddingsVisualizationModule) {
+                window.EmbeddingsVisualizationModule.updateCategoryHierarchyCard();
+            }
         }
     }
     

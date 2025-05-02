@@ -48,6 +48,9 @@
                     <a href="#conversations"><i class="bi bi-chat"></i> Conversations</a>
                 </li>
                 <li class="menu-header">ADVANCED</li>
+                <li class="menu-item" data-target="embeddings-visualization-section">
+                    <a href="#embeddings"><i class="bi bi-diagram-3"></i> Embeddings Visualization</a>
+                </li>
                 <li class="menu-item" data-target="debug-insights-section">
                     <a href="#debug-insights"><i class="bi bi-bug"></i> Debug Insights</a>
                 </li>
@@ -363,6 +366,97 @@
                         </div>
                     </section>
                     
+                    <!-- Embeddings Visualization Section -->
+                    <section id="embeddings-visualization-section" class="content-section">
+                        <div class="dashboard-card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h3><i class="bi bi-diagram-3 me-2"></i>Restaurant Category Insights</h3>
+                                <div>
+                                    <button class="btn btn-sm btn-light" id="refreshVisualization">
+                                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <ul class="nav nav-tabs" id="visualizationTabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="hierarchy-tab" data-bs-toggle="tab" data-bs-target="#hierarchy" type="button" role="tab">
+                                            <i class="bi bi-diagram-3 me-1"></i>Category Hierarchy
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="similarity-tab" data-bs-toggle="tab" data-bs-target="#similarity" type="button" role="tab">
+                                            <i class="bi bi-grid me-1"></i>Semantic Similarity
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="distribution-tab" data-bs-toggle="tab" data-bs-target="#distribution" type="button" role="tab">
+                                            <i class="bi bi-bar-chart me-1"></i>Distribution
+                                        </button>
+                                    </li>
+                                </ul>
+                                <div class="tab-content p-3 border border-top-0 rounded-bottom" id="visualizationTabsContent">
+                                    <!-- Category Hierarchy Visualization -->
+                                    <div class="tab-pane fade show active" id="hierarchy" role="tabpanel">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <div class="card">
+                                                    <div class="card-body">
+                                                        <h6 class="card-title">Visualization Options</h6>
+                                                        <div class="mb-3">
+                                                            <label for="hierarchyType" class="form-label">Visualization Type</label>
+                                                            <select class="form-select form-select-sm" id="hierarchyType">
+                                                                <option value="sunburst">Sunburst Chart</option>
+                                                                <option value="treemap">Tree Map</option>
+                                                                <option value="circlepack">Circle Packing</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label for="hierarchyColorScheme" class="form-label">Color Scheme</label>
+                                                            <select class="form-select form-select-sm" id="hierarchyColorScheme">
+                                                                <option value="viridis">Viridis</option>
+                                                                <option value="plasma">Plasma</option>
+                                                                <option value="category10">Category10</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="d-grid">
+                                                            <button class="btn btn-sm btn-primary" id="updateHierarchyViz">
+                                                                <i class="bi bi-arrow-repeat"></i> Update Visualization
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-9">
+                                                <div id="categoryHierarchyCard">
+                                                    <div class="visualization-container bg-white rounded p-2" id="hierarchyViz" style="height: 500px;"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Semantic Similarity Visualization -->
+                                    <div class="tab-pane fade" id="similarity" role="tabpanel">
+                                        <div class="alert alert-info">
+                                            <h6><i class="bi bi-info-circle"></i> Semantic Similarity Visualization</h6>
+                                            <p class="mb-0">This visualization shows how different concepts relate to each other based on their embedding vectors. Similar concepts appear closer together.</p>
+                                        </div>
+                                        <div class="visualization-container bg-white rounded p-2" id="similarityViz" style="height: 500px;"></div>
+                                    </div>
+                                    
+                                    <!-- Distribution Analysis -->
+                                    <div class="tab-pane fade" id="distribution" role="tabpanel">
+                                        <div class="alert alert-info">
+                                            <h6><i class="bi bi-info-circle"></i> Category Distribution Analysis</h6>
+                                            <p class="mb-0">This visualization shows the distribution of categories and the number of concepts within each category.</p>
+                                        </div>
+                                        <div class="visualization-container bg-white rounded p-2" id="distributionViz" style="height: 500px;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    
                     <!-- Recommendations Section - Now only contains the comparison table -->
                     <section id="recommendations-section" class="content-section">
                         <div class="dashboard-card">
@@ -433,5 +527,27 @@
     <script src="/static/js/pdf-export.js"></script>
     <script src="/static/js/ui-controls.js"></script>
     <script src="/static/js/main.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js@2.18.0/dist/plotly.min.js"></script>
+    <script src="{{ url_for('static', filename='js/embeddings-visualization.js') }}"></script>
+    <script>
+        // Initialize everything once the document is fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Ensure embeddings visualization is initialized when its section is shown
+            document.querySelectorAll('.menu-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const targetId = this.getAttribute('data-target');
+                    if (targetId === 'embeddings-visualization-section') {
+                        // Allow a moment for the section to become visible
+                        setTimeout(() => {
+                            if (window.EmbeddingsVisualizationModule && 
+                                typeof window.EmbeddingsVisualizationModule.refreshVisualizations === 'function') {
+                                window.EmbeddingsVisualizationModule.refreshVisualizations();
+                            }
+                        }, 100);
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>
