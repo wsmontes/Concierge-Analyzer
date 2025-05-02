@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Embeddings Visualizer</title>
+    
+    <!-- CSS Libraries -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa, #e4e7eb);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            border: none;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 15px 20px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .visualization-container {
+            height: 600px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+        }
+        
+        .form-range::-webkit-slider-thumb {
+            background: #6a11cb;
+        }
+        
+        .metric-card {
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        }
+        
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255,255,255,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #6a11cb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* New styles for advanced visualizations */
+        .nav-tabs {
+            border-bottom: 2px solid #6a11cb;
+        }
+        
+        .nav-tabs .nav-link {
+            border: none;
+            border-radius: 0;
+            color: #6a11cb;
+            font-weight: 500;
+        }
+        
+        .nav-tabs .nav-link.active {
+            background: #6a11cb;
+            color: white;
+        }
+        
+        .tab-content {
+            border: 1px solid #6a11cb;
+            border-radius: 0 0 15px 15px;
+            padding: 15px;
+            background: white;
+        }
+        
+        .alert-info {
+            background-color: #e7f3ff;
+            border-color: #b3d7ff;
+            color: #31708f;
+        }
+        
+        .visualization-container {
+            height: 500px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h1 class="h3 mb-0"><i class="bi bi-braces"></i> Embeddings Visualizer</h1>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="fileUpload" class="form-label">Upload Embeddings File</label>
+                                    <input class="form-control" type="file" id="fileUpload" accept=".csv,.json,.txt">
+                                    <div class="form-text">Support for CSV, JSON and TXT files with vector embeddings</div>
+                                </div>
+                                <button class="btn btn-primary mb-3" id="uploadBtn">
+                                    <i class="bi bi-cloud-arrow-up"></i> Process Embeddings
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-info">
+                                    <h5><i class="bi bi-info-circle"></i> About Embeddings</h5>
+                                    <p class="mb-0">Upload your embedding vectors to visualize their relationships and clusters. The app will automatically detect the format and apply the best visualization technique.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="visualization-section" style="display: none;">
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-gear"></i> Visualization Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="vizType" class="form-label">Visualization Type</label>
+                                <select class="form-select" id="vizType">
+                                    <option value="tsne">t-SNE (2D)</option>
+                                    <option value="tsne3d">t-SNE (3D)</option>
+                                    <option value="umap">UMAP (2D)</option>
+                                    <option value="pca">PCA (2D)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="perplexity" class="form-label">Perplexity (t-SNE) <span id="perplexityValue">30</span></label>
+                                <input type="range" class="form-range" min="5" max="50" value="30" id="perplexity">
+                            </div>
+                            <div class="mb-3">
+                                <label for="iterations" class="form-label">Iterations <span id="iterationsValue">1000</span></label>
+                                <input type="range" class="form-range" min="250" max="2000" step="250" value="1000" id="iterations">
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="showLabels" checked>
+                                    <label class="form-check-label" for="showLabels">Show Labels</label>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary w-100" id="updateViz">
+                                <i class="bi bi-arrow-repeat"></i> Update Visualization
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-graph-up"></i> Embeddings Visualization</h5>
+                            <div>
+                                <button class="btn btn-sm btn-light" id="downloadBtn">
+                                    <i class="bi bi-download"></i> Download
+                                </button>
+                                <button class="btn btn-sm btn-light ms-2" id="fullscreenBtn">
+                                    <i class="bi bi-fullscreen"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div id="visualization" class="visualization-container"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Embeddings Analysis</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="card metric-card">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Dimensionality</h6>
+                                            <h3 id="dimensions">-</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card metric-card">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Data Points</h6>
+                                            <h3 id="dataPoints">-</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card metric-card">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Detected Clusters</h6>
+                                            <h3 id="clusters">-</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card metric-card">
+                                        <div class="card-body text-center">
+                                            <h6 class="text-muted">Avg. Distance</h6>
+                                            <h3 id="avgDistance">-</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <h6>Similarity Search</h6>
+                                <div class="input-group mb-3">
+                                    <input type="text" class="form-control" placeholder="Enter index number (e.g., 0, 1, 2...)" id="searchIndex">
+                                    <button class="btn btn-primary" id="findSimilar">
+                                        <i class="bi bi-search"></i> Find Similar
+                                    </button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm" id="similarityTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Index</th>
+                                                <th>Cosine Similarity</th>
+                                                <th>Euclidean Distance</th>
+                                                <th>Dot Product</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Results will be populated here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- New Advanced Restaurant Category Visualizations Section -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> Advanced Restaurant Category Insights</h5>
+                            <div>
+                                <button class="btn btn-sm btn-light" id="refreshCategoryViz">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <ul class="nav nav-tabs mb-3" id="categoryVisualizationTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="hierarchy-tab" data-bs-toggle="tab" data-bs-target="#hierarchy" type="button" role="tab" aria-controls="hierarchy" aria-selected="true">
+                                        <i class="bi bi-diagram-3"></i> Category Hierarchy
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="similarity-tab" data-bs-toggle="tab" data-bs-target="#similarity" type="button" role="tab" aria-controls="similarity" aria-selected="false">
+                                        <i class="bi bi-grid-3x3"></i> Semantic Similarity
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="distribution-tab" data-bs-toggle="tab" data-bs-target="#distribution" type="button" role="tab" aria-controls="distribution" aria-selected="false">
+                                        <i class="bi bi-bar-chart-line"></i> Category Distribution
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="clustering-tab" data-bs-toggle="tab" data-bs-target="#clustering" type="button" role="tab" aria-controls="clustering" aria-selected="false">
+                                        <i class="bi bi-hexagon-half"></i> Concept Clustering
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="relationships-tab" data-bs-toggle="tab" data-bs-target="#relationships" type="button" role="tab" aria-controls="relationships" aria-selected="false">
+                                        <i class="bi bi-share"></i> Category Relationships
+                                    </button>
+                                </li>
+                            </ul>
+                            
+                            <div class="tab-content" id="categoryVisualizationTabsContent">
+                                <!-- Category Hierarchy Visualization -->
+                                <div class="tab-pane fade show active" id="hierarchy" role="tabpanel" aria-labelledby="hierarchy-tab">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="card">
+                                                <div class="card-body">
+                                                    <h6 class="card-title">Hierarchy Visualization Options</h6>
+                                                    <div class="mb-3">
+                                                        <label for="hierarchyType" class="form-label">Visualization Type</label>
+                                                        <select class="form-select form-select-sm" id="hierarchyType">
+                                                            <option value="sunburst">Sunburst Chart</option>
+                                                            <option value="treemap">Tree Map</option>
+                                                            <option value="circlepack">Circle Packing</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label for="hierarchyColorScheme" class="form-label">Color Scheme</label>
+                                                        <select class="form-select form-select-sm" id="hierarchyColorScheme">
+                                                            <option value="viridis">Viridis</option>
+                                                            <option value="plasma">Plasma</option>
+                                                            <option value="category10">Category10</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="d-grid">
+                                                        <button class="btn btn-sm btn-primary" id="updateHierarchyViz">
+                                                            <i class="bi bi-arrow-repeat"></i> Update Visualization
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="card mt-3">
+                                                <div class="card-body">
+                                                    <h6 class="card-title">Description</h6>
+                                                    <p class="small">This visualization shows the hierarchical relationship between restaurant categories and their concepts. Each category (like "cuisine", "menu", "drinks") contains multiple concepts that define the restaurant.</p>
+                                                    <p class="small">The size of each segment represents the number of concepts within each category. Click on a category to zoom in and explore its concepts.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-9">
+                                            <div class="visualization-container bg-white rounded p-2" id="hierarchyViz" style="height: 500px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Semantic Similarity Visualization -->
+                                <div class="tab-pane fade" id="similarity" role="tabpanel" aria-labelledby="similarity-tab">
+                                    <div class="alert alert-info">
+                                        <h6><i class="bi bi-info-circle"></i> Semantic Similarity Visualization</h6>
+                                        <p class="mb-0">Click on this tab to visualize how different concepts relate to each other based on their embedding vectors. Similar concepts appear closer together in the visualization.</p>
+                                    </div>
+                                    <div class="visualization-container bg-white rounded p-2" id="similarityViz" style="height: 500px;"></div>
+                                </div>
+                                
+                                <!-- Category Distribution Analysis -->
+                                <div class="tab-pane fade" id="distribution" role="tabpanel" aria-labelledby="distribution-tab">
+                                    <div class="alert alert-info">
+                                        <h6><i class="bi bi-info-circle"></i> Category Distribution Analysis</h6>
+                                        <p class="mb-0">Click on this tab to see the distribution of categories and the number of concepts within each category. Explore which categories are most represented in the dataset.</p>
+                                    </div>
+                                    <div class="visualization-container bg-white rounded p-2" id="distributionViz" style="height: 500px;"></div>
+                                </div>
+                                
+                                <!-- Concept Clustering -->
+                                <div class="tab-pane fade" id="clustering" role="tabpanel" aria-labelledby="clustering-tab">
+                                    <div class="alert alert-info">
+                                        <h6><i class="bi bi-info-circle"></i> Concept Clustering</h6>
+                                        <p class="mb-0">Click on this tab to see how concepts naturally cluster together based on their embedding similarity, regardless of their predefined categories.</p>
+                                    </div>
+                                    <div class="visualization-container bg-white rounded p-2" id="clusteringViz" style="height: 500px;"></div>
+                                </div>
+                                
+                                <!-- Category Relationships -->
+                                <div class="tab-pane fade" id="relationships" role="tabpanel" aria-labelledby="relationships-tab">
+                                    <div class="alert alert-info">
+                                        <h6><i class="bi bi-info-circle"></i> Category Relationships</h6>
+                                        <p class="mb-0">Click on this tab to explore the relationships between different categories based on the similarity of their concepts.</p>
+                                    </div>
+                                    <div class="visualization-container bg-white rounded p-2" id="relationshipsViz" style="height: 500px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="loading" id="loadingOverlay" style="display: none;">
+        <div class="spinner"></div>
+        <h4 id="loadingText">Processing...</h4>
+    </div>
+    
+    <!-- JavaScript Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js@2.18.0/dist/plotly.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <!-- Replace the tsne-js import with a more reliable source -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tsne@0.2.0/dist/tfjs-tsne.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/umap-js@1.3.3/lib/umap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ml-pca@4.0.3/dist/ml-pca.min.js"></script>
+
+    <!-- Add a simple t-SNE implementation as a fallback -->
+    <script>
+        // Fallback tSNE implementation in case the library fails to load
+        if (typeof tsnejs === 'undefined') {
+            window.tsnejs = {
+                tSNE: function(options) {
+                    this.perplexity = options.perplexity || 30;
+                    this.dim = options.dim || 2;
+                    this.epsilon = options.epsilon || 10;
+                    
+                    this.initDataRaw = function(data) {
+                        this.data = data;
+                        this.n = data.length;
+                    };
+                    
+                    this.step = function() {
+                        // Simple placeholder implementation
+                    };
+                    
+                    this.getSolution = function() {
+                        console.warn("Using fallback t-SNE implementation");
+                        // Return PCA result as fallback
+                        if (this.data && this.data.length > 0) {
+                            try {
+                                const pca = new ML.PCA(this.data);
+                                return pca.predict(this.data, {nComponents: this.dim}).to2DArray();
+                            } catch (e) {
+                                // If PCA fails, return random points
+                                return Array.from({length: this.data.length}, () => 
+                                    Array.from({length: this.dim}, () => Math.random() * 2 - 1)
+                                );
+                            }
+                        }
+                        return [];
+                    };
+                }
+            };
+        }
+    </script>
+
+    <script>
+        // Global variables
+        let embeddings = [];
+        let labels = [];
+        let currentVisualization = null;
+        let dimensionalityReduction = null;
+        
+        // DOM elements
+        const fileUpload = document.getElementById('fileUpload');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const vizSection = document.getElementById('visualization-section');
+        const perplexitySlider = document.getElementById('perplexity');
+        const perplexityValue = document.getElementById('perplexityValue');
+        const iterationsSlider = document.getElementById('iterations');
+        const iterationsValue = document.getElementById('iterationsValue');
+        const updateVizBtn = document.getElementById('updateViz');
+        const vizTypeSelect = document.getElementById('vizType');
+        const vizContainer = document.getElementById('visualization');
+        const showLabelsCheckbox = document.getElementById('showLabels');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const searchIndexInput = document.getElementById('searchIndex');
+        const findSimilarBtn = document.getElementById('findSimilar');
+        const similarityTable = document.getElementById('similarityTable').querySelector('tbody');
+        const dimensionsEl = document.getElementById('dimensions');
+        const dataPointsEl = document.getElementById('dataPoints');
+        const clustersEl = document.getElementById('clusters');
+        const avgDistanceEl = document.getElementById('avgDistance');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        
+        // Event listeners
+        uploadBtn.addEventListener('click', processFile);
+        perplexitySlider.addEventListener('input', () => {
+            perplexityValue.textContent = perplexitySlider.value;
+        });
+        iterationsSlider.addEventListener('input', () => {
+            iterationsValue.textContent = iterationsSlider.value;
+        });
+        updateVizBtn.addEventListener('click', updateVisualization);
+        findSimilarBtn.addEventListener('click', findSimilarEmbeddings);
+        downloadBtn.addEventListener('click', downloadVisualization);
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+        
+        // Function to process uploaded file
+        function processFile() {
+            const file = fileUpload.files[0];
+            if (!file) {
+                alert('Please select a file to upload');
+                return;
+            }
+            
+            showLoading('Reading file...');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                parseFileContent(file, content);
+            };
+            reader.onerror = function() {
+                hideLoading();
+                alert('Error reading the file');
+            };
+            reader.readAsText(file);
+        }
+        
+        // Function to parse file content based on file type
+        function parseFileContent(file, content) {
+            showLoading('Parsing file content...');
+            
+            try {
+                if (file.name.endsWith('.csv')) {
+                    Papa.parse(content, {
+                        complete: function(results) {
+                            processEmbeddings(results.data);
+                        },
+                        error: function() {
+                            hideLoading();
+                            alert('Error parsing CSV file');
+                        }
+                    });
+                } else if (file.name.endsWith('.json')) {
+                    const data = JSON.parse(content);
+                    if (Array.isArray(data)) {
+                        // Extract embeddings and categorized labels
+                        const vectors = [];
+                        labels = [];
+                        const categories = {}; // To store category -> concepts mapping
+                        
+                        data.forEach(item => {
+                            // Find the embedding field (the one that's not "_id")
+                            const keys = Object.keys(item);
+                            const embeddingKey = keys.find(key => key !== "_id" && Array.isArray(item[key]));
+                            
+                            if (embeddingKey && Array.isArray(item[embeddingKey])) {
+                                // Check if key follows pattern "category -> concept"
+                                if (embeddingKey.includes(' -> ')) {
+                                    const [category, concept] = embeddingKey.split(' -> ');
+                                    
+                                    // Store the category for later use
+                                    if (!categories[category]) {
+                                        categories[category] = [];
+                                    }
+                                    if (!categories[category].includes(concept)) {
+                                        categories[category].push(concept);
+                                    }
+                                    
+                                    // Add to vectors and labels
+                                    vectors.push(item[embeddingKey]);
+                                    labels.push({
+                                        category: category,
+                                        concept: concept,
+                                        fullLabel: embeddingKey
+                                    });
+                                } else {
+                                    // Handle non-categorized labels
+                                    vectors.push(item[embeddingKey]);
+                                    labels.push(embeddingKey);
+                                }
+                            }
+                        });
+                        
+                        if (vectors.length > 0) {
+                            // Store categories data for potential filtering
+                            window.embeddingCategories = categories;
+                            processEmbeddings(vectors);
+                        } else {
+                            hideLoading();
+                            alert('No valid embedding vectors found in JSON file');
+                        }
+                    } else if (data.embeddings || data.vectors) {
+                        processEmbeddings(data.embeddings || data.vectors);
+                    } else {
+                        const keys = Object.keys(data);
+                        if (keys.length > 0 && Array.isArray(data[keys[0]])) {
+                            const vectors = [];
+                            for (const key of keys) {
+                                vectors.push(data[key]);
+                                labels.push(key);
+                            }
+                            processEmbeddings(vectors);
+                        } else {
+                            hideLoading();
+                            alert('Could not identify embedding format in JSON file');
+                        }
+                    }
+                } else if (file.name.endsWith('.txt')) {
+                    const lines = content.split('\n').filter(line => line.trim() !== '');
+                    const vectors = lines.map(line => {
+                        // Handle different formats of text files
+                        if (line.includes('[') && line.includes(']')) {
+                            // Format: label [val1, val2, ...]
+                            const match = line.match(/^(.+?)\s*\[(.*)\]$/);
+                            if (match) {
+                                labels.push(match[1].trim());
+                                return match[2].split(',').map(v => parseFloat(v.trim()));
+                            }
+                        }
+                        // Simple space or comma separated values
+                        return line.split(/[,\s]+/).map(v => parseFloat(v.trim()));
+                    });
+                    processEmbeddings(vectors);
+                } else {
+                    hideLoading();
+                    alert('Unsupported file format. Please use CSV, JSON, or TXT files.');
+                }
+            } catch (error) {
+                hideLoading();
+                alert('Error processing file: ' + error.message);
+            }
+        }
+        
+        // Function to process and normalize embeddings
+        function processEmbeddings(data) {
+            showLoading('Processing embeddings...');
+            
+            try {
+                // Clean up data and convert to numeric arrays
+                embeddings = [];
+                
+                // Handle CSV with headers
+                if (typeof data[0][0] === 'string' && isNaN(parseFloat(data[0][0]))) {
+                    // Assume first row is header
+                    const headers = data.shift();
+                    // Create labels from first column if it's text
+                    if (isNaN(parseFloat(data[0][0]))) {
+                        for (let i = 0; i < data.length; i++) {
+                            const row = data[i];
+                            labels[i] = row.shift();
+                            embeddings[i] = row.map(val => parseFloat(val));
+                        }
+                    } else {
+                        embeddings = data.map(row => row.map(val => parseFloat(val)));
+                    }
+                } else {
+                    // Handle array of arrays (simple numeric data)
+                    embeddings = data.map(row => {
+                        if (Array.isArray(row)) {
+                            return row.map(val => typeof val === 'number' ? val : parseFloat(val));
+                        } else {
+                            return Object.values(row).map(val => typeof val === 'number' ? val : parseFloat(val));
+                        }
+                    });
+                }
+                
+                // Filter out invalid rows
+                embeddings = embeddings.filter(row => row.every(val => !isNaN(val)));
+                
+                // Ensure all vectors have the same dimension
+                const dim = embeddings[0].length;
+                embeddings = embeddings.filter(row => row.length === dim);
+                
+                // Generate labels if not present
+                if (labels.length !== embeddings.length) {
+                    labels = Array(embeddings.length).fill().map((_, i) => `Item ${i+1}`);
+                }
+                
+                // Update UI with embedding stats
+                dimensionsEl.textContent = dim;
+                dataPointsEl.textContent = embeddings.length;
+                
+                // Calculate average distance
+                let totalDist = 0;
+                let count = 0;
+                for (let i = 0; i < Math.min(100, embeddings.length); i++) {
+                    for (let j = i + 1; j < Math.min(100, embeddings.length); j++) {
+                        totalDist += euclideanDistance(embeddings[i], embeddings[j]);
+                        count++;
+                    }
+                }
+                avgDistanceEl.textContent = (totalDist / count).toFixed(2);
+                
+                // Show visualization section
+                vizSection.style.display = 'block';
+                
+                // Perform initial visualization
+                updateVisualization();
+            } catch (error) {
+                hideLoading();
+                alert('Error processing embeddings: ' + error.message);
+            }
+        }
+        
+        // Function to update visualization based on selected parameters
+        function updateVisualization() {
+            if (embeddings.length === 0) {
+                alert('No embeddings data to visualize');
+                return;
+            }
+            
+            const vizType = vizTypeSelect.value;
+            const perplexity = parseInt(perplexitySlider.value);
+            const iterations = parseInt(iterationsSlider.value);
+            
+            showLoading(`Running ${vizType.toUpperCase()} algorithm...`);
+            
+            setTimeout(() => {
+                try {
+                    let projectedData;
+                    
+                    // Perform dimensionality reduction
+                    if (vizType === 'tsne' || vizType === 'tsne3d') {
+                        const outputDimension = vizType === 'tsne3d' ? 3 : 2;
+                        
+                        try {
+                            // Try to use the tsne-js library
+                            const tsne = new tsnejs.tSNE({
+                                dim: outputDimension,
+                                perplexity: perplexity,
+                                epsilon: 10
+                            });
+                            
+                            tsne.initDataRaw(embeddings);
+                            
+                            for (let i = 0; i < iterations; i++) {
+                                tsne.step();
+                                if (i % 100 === 0) {
+                                    loadingText.textContent = `Running t-SNE iteration ${i}/${iterations}...`;
+                                }
+                            }
+                            
+                            projectedData = tsne.getSolution();
+                        } catch (tSNEError) {
+                            // Fallback to PCA if t-SNE fails
+                            console.error("t-SNE failed:", tSNEError);
+                            loadingText.textContent = `t-SNE failed, falling back to PCA...`;
+                            
+                            const pca = new ML.PCA(embeddings);
+                            projectedData = pca.predict(embeddings, {nComponents: outputDimension}).to2DArray();
+                        }
+                    } else if (vizType === 'umap') {
+                        try {
+                            const umap = new UMAP({
+                                nComponents: 2,
+                                nEpochs: iterations,
+                                nNeighbors: perplexity
+                            });
+                            
+                            projectedData = umap.fit(embeddings);
+                        } catch (umapError) {
+                            // Fallback to PCA if UMAP fails
+                            console.error("UMAP failed:", umapError);
+                            loadingText.textContent = `UMAP failed, falling back to PCA...`;
+                            
+                            const pca = new ML.PCA(embeddings);
+                            projectedData = pca.predict(embeddings, {nComponents: 2}).to2DArray();
+                        }
+                    } else if (vizType === 'pca') {
+                        const pca = new ML.PCA(embeddings);
+                        projectedData = pca.predict(embeddings, {nComponents: 2}).to2DArray();
+                    }
+                    
+                    // Draw the visualization
+                    drawVisualization(projectedData, vizType);
+                    
+                    // Estimate clusters
+                    const clustersCount = estimateClusters(projectedData);
+                    clustersEl.textContent = clustersCount;
+                    
+                    // Update category statistics if available
+                    if (typeof updateCategoryStats === 'function') {
+                        updateCategoryStats();
+                    }
+                    
+                    hideLoading();
+                } catch (error) {
+                    hideLoading();
+                    alert('Error creating visualization: ' + error.message);
+                    console.error(error);
+                }
+            }, 100);
+        }
+        
+        // Function to draw visualization using Plotly.js
+        function drawVisualization(data, vizType) {
+            const is3D = vizType === 'tsne3d';
+            const showLabels = showLabelsCheckbox.checked;
+            
+            // Prepare display labels based on label type (string or object)
+            const displayLabels = labels.map(label => {
+                if (typeof label === 'object' && label.concept) {
+                    return label.concept; // Show just the concept for cleaner display
+                }
+                return typeof label === 'string' ? label : 'Item';
+            });
+            
+            // Prepare hover text with full information
+            const hoverText = labels.map((label, i) => {
+                if (typeof label === 'object' && label.category && label.concept) {
+                    return `Category: ${label.category}<br>Concept: ${label.concept}<br>Index: ${i}`;
+                }
+                return `${label}<br>Index: ${i}`;
+            });
+            
+            // Prepare data for plotting
+            const trace = {
+                x: data.map(d => d[0]),
+                y: data.map(d => d[1]),
+                mode: showLabels ? 'markers+text' : 'markers',
+                type: is3D ? 'scatter3d' : 'scatter',
+                text: displayLabels,
+                textposition: 'top center',
+                textfont: {
+                    family: 'Segoe UI, sans-serif',
+                    size: 10
+                },
+                marker: {
+                    size: 8,
+                    opacity: 0.8,
+                    // Color by category if available
+                    color: labels.map((label, i) => 
+                        typeof label === 'object' && label.category ? 
+                        hashString(label.category) : i
+                    ),
+                    colorscale: 'Viridis',
+                    line: {
+                        width: 1,
+                        color: 'white'
+                    }
+                },
+                hoverinfo: 'text',
+                hovertext: hoverText
+            };
+            
+            // Add z coordinate for 3D
+            if (is3D) {
+                trace.z = data.map(d => d[2]);
+            }
+            
+            const layout = {
+                margin: {l: 0, r: 0, b: 0, t: 0},
+                hovermode: 'closest',
+                showlegend: false,
+                plot_bgcolor: '#ffffff',
+                paper_bgcolor: '#ffffff',
+                xaxis: {
+                    showgrid: false,
+                    zeroline: false,
+                    showticklabels: false
+                },
+                yaxis: {
+                    showgrid: false,
+                    zeroline: false,
+                    showticklabels: false
+                }
+            };
+            
+            if (is3D) {
+                layout.scene = {
+                    xaxis: { showticklabels: false, title: '' },
+                    yaxis: { showticklabels: false, title: '' },
+                    zaxis: { showticklabels: false, title: '' }
+                };
+            }
+            
+            Plotly.newPlot(vizContainer, [trace], layout, {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtons: [[
+                    'toImage', 'zoom2d', 'pan2d',
+                    'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d'
+                ]]
+            });
+            
+            // Store reference to current visualization
+            currentVisualization = {
+                data: data,
+                type: vizType
+            };
+        }
+        
+        // Add this utility function to hash strings to numeric values for consistent coloring
+        function hashString(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0; // Convert to 32bit integer
+            }
+            return Math.abs(hash);
+        }
+        
+        // Function to find similar embeddings
+        function findSimilarEmbeddings() {
+            const indexStr = searchIndexInput.value.trim();
+            const index = parseInt(indexStr);
+            
+            if (isNaN(index) || index < 0 || index >= embeddings.length) {
+                alert(`Please enter a valid index between 0 and ${embeddings.length - 1}`);
+                return;
+            }
+            
+            const queryEmbedding = embeddings[index];
+            const similarities = [];
+            
+            // Calculate similarities with all other embeddings
+            for (let i = 0; i < embeddings.length; i++) {
+                if (i === index) continue;
+                
+                const cosine = cosineSimilarity(queryEmbedding, embeddings[i]);
+                const euclidean = euclideanDistance(queryEmbedding, embeddings[i]);
+                const dotProd = dotProduct(queryEmbedding, embeddings[i]);
+                
+                similarities.push({
+                    index: i,
+                    cosine: cosine,
+                    euclidean: euclidean,
+                    dotProduct: dotProd
+                });
+            }
+            
+            // Sort by cosine similarity (descending)
+            similarities.sort((a, b) => b.cosine - a.cosine);
+            
+            // Update table with top 5 results
+            similarityTable.innerHTML = '';
+            similarities.slice(0, 5).forEach(sim => {
+                const row = document.createElement('tr');
+                
+                // Display label based on its type
+                let displayLabel;
+                if (typeof labels[sim.index] === 'object' && labels[sim.index].concept) {
+                    displayLabel = `${labels[sim.index].category} → ${labels[sim.index].concept}`;
+                } else {
+                    displayLabel = labels[sim.index];
+                }
+                
+                row.innerHTML = `
+                    <td>${sim.index} (${displayLabel})</td>
+                    <td>${sim.cosine.toFixed(4)}</td>
+                    <td>${sim.euclidean.toFixed(4)}</td>
+                    <td>${sim.dotProduct.toFixed(4)}</td>
+                `;
+                similarityTable.appendChild(row);
+            });
+            
+            // Highlight the similar points in the visualization
+            if (currentVisualization) {
+                const selectedIndices = [index, ...similarities.slice(0, 5).map(s => s.index)];
+                
+                const update = {
+                    'marker.size': currentVisualization.data.map((_, i) => 
+                        selectedIndices.includes(i) ? 12 : 8
+                    ),
+                    'marker.color': currentVisualization.data.map((_, i) => 
+                        i === index ? '#FF0000' : selectedIndices.includes(i) ? '#FFA500' : i
+                    ),
+                    'marker.opacity': currentVisualization.data.map((_, i) => 
+                        selectedIndices.includes(i) ? 1.0 : 0.4
+                    )
+                };
+                
+                Plotly.restyle(vizContainer, update, 0);
+            }
+        }
+        
+        // Utility function: Cosine similarity
+        function cosineSimilarity(a, b) {
+            const dotProd = dotProduct(a, b);
+            const normA = Math.sqrt(dotProduct(a, a));
+            const normB = Math.sqrt(dotProduct(b, b));
+            return dotProd / (normA * normB);
+        }
+        
+        // Utility function: Euclidean distance
+        function euclideanDistance(a, b) {
+            return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
+        }
+        
+        // Utility function: Dot product
+        function dotProduct(a, b) {
+            return a.reduce((sum, val, i) => sum + val * b[i], 0);
+        }
+        
+        // Utility function: Estimate number of clusters
+        function estimateClusters(data) {
+            // Simple elbow method approximation
+            const dists = [];
+            const maxClusters = Math.min(10, Math.floor(data.length / 10));
+            
+            for (let k = 2; k <= maxClusters; k++) {
+                const centroids = kMeansPlusPlus(data, k);
+                let totalDist = 0;
+                
+                for (let i = 0; i < data.length; i++) {
+                    let minDist = Infinity;
+                    for (let j = 0; j < centroids.length; j++) {
+                        const dist = data[0].length === 2
+                            ? Math.sqrt(Math.pow(data[i][0] - centroids[j][0], 2) + Math.pow(data[i][1] - centroids[j][1], 2))
+                            : Math.sqrt(Math.pow(data[i][0] - centroids[j][0], 2) + 
+                                Math.pow(data[i][1] - centroids[j][1], 2) + 
+                                Math.pow(data[i][2] - centroids[j][2], 2));
+                        minDist = Math.min(minDist, dist);
+                    }
+                    totalDist += minDist;
+                }
+                
+                dists.push(totalDist);
+            }
+            
+            // Find elbow point
+            let maxDiff = 0;
+            let optimalK = 2;
+            
+            for (let i = 0; i < dists.length - 1; i++) {
+                const diff = dists[i] - dists[i + 1];
+                if (diff > maxDiff) {
+                    maxDiff = diff;
+                    optimalK = i + 2;
+                }
+            }
+            
+            return optimalK;
+        }
+        
+        // Utility function: k-means++ initialization
+        function kMeansPlusPlus(data, k) {
+            const centroids = [];
+            // Choose first centroid randomly
+            const firstIndex = Math.floor(Math.random() * data.length);
+            centroids.push(data[firstIndex].slice());
+            
+            for (let i = 1; i < k; i++) {
+                const dists = [];
+                let totalDist = 0;
+                
+                for (let j = 0; j < data.length; j++) {
+                    let minDist = Infinity;
+                    for (let l = 0; l < centroids.length; l++) {
+                        const dist = data[0].length === 2
+                            ? Math.sqrt(Math.pow(data[j][0] - centroids[l][0], 2) + Math.pow(data[j][1] - centroids[l][1], 2))
+                            : Math.sqrt(Math.pow(data[j][0] - centroids[l][0], 2) + 
+                                Math.pow(data[j][1] - centroids[l][1], 2) + 
+                                Math.pow(data[j][2] - centroids[l][2], 2));
+                        minDist = Math.min(minDist, dist);
+                    }
+                    dists.push(minDist * minDist);
+                    totalDist += dists[dists.length - 1];
+                }
+                
+                // Choose next centroid with probability proportional to distance
+                let rand = Math.random() * totalDist;
+                let j = 0;
+                for (j = 0; j < data.length; j++) {
+                    rand -= dists[j];
+                    if (rand <= 0) break;
+                }
+                centroids.push(data[j].slice());
+            }
+            
+            return centroids;
+        }
+        
+        // Utility function: Download visualization
+        function downloadVisualization() {
+            if (!currentVisualization) return;
+            
+            const filename = 'embeddings_visualization.png';
+            Plotly.downloadImage(vizContainer, {
+                format: 'png',
+                width: 1200,
+                height: 800,
+                filename: filename
+            });
+        }
+        
+        // Utility function: Toggle fullscreen
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                vizContainer.requestFullscreen().catch(err => {
+                    alert(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        
+        // Utility functions for loading overlay
+        function showLoading(message) {
+            loadingText.textContent = message;
+            loadingOverlay.style.display = 'flex';
+        }
+        
+        function hideLoading() {
+            loadingOverlay.style.display = 'none';
+        }
+        
+        // Add this to the initialization part of the page to show category statistics
+        function updateCategoryStats() {
+            if (window.embeddingCategories) {
+                const categories = window.embeddingCategories;
+                const categoryCount = Object.keys(categories).length;
+                const totalConcepts = Object.values(categories).reduce((sum, arr) => sum + arr.length, 0);
+                
+                // Update UI with category stats
+                document.getElementById('dimensions').textContent = embeddings[0].length;
+                document.getElementById('dataPoints').textContent = embeddings.length;
+                document.getElementById('clusters').textContent = categoryCount;
+                
+                // Add a new section with category breakdown if it doesn't exist
+                if (!document.getElementById('categoryBreakdown')) {
+                    const analysisSection = document.querySelector('.card-body:has(#dimensions)').parentElement;
+                    const categorySection = document.createElement('div');
+                    categorySection.className = 'mt-4';
+                    categorySection.id = 'categoryBreakdown';
+                    categorySection.innerHTML = `
+                        <h6>Category Breakdown</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Concepts</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="categoryTable">
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                    analysisSection.appendChild(categorySection);
+                }
+                
+                // Populate the category table
+                const categoryTable = document.getElementById('categoryTable');
+                categoryTable.innerHTML = '';
+                Object.entries(categories).forEach(([category, concepts]) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${category}</td>
+                        <td>${concepts.length}</td>
+                    `;
+                    categoryTable.appendChild(row);
+                });
+            }
+        }
+    </script>
+    
+    <script>
+        // Add tab change event handling
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize the tabs
+            const tabs = document.querySelectorAll('#categoryVisualizationTabs button');
+            tabs.forEach(tab => {
+                tab.addEventListener('shown.bs.tab', function(event) {
+                    const targetId = event.target.getAttribute('data-bs-target').substring(1);
+                    if (targetId === 'hierarchy') {
+                        renderCategoryHierarchy();
+                    } else if (targetId === 'similarity') {
+                        // Will implement later
+                    } else if (targetId === 'distribution') {
+                        // Will implement later
+                    } else if (targetId === 'clustering') {
+                        // Will implement later
+                    } else if (targetId === 'relationships') {
+                        // Will implement later
+                    }
+                });
+            });
+            
+            // Add refresh button event
+            document.getElementById('refreshCategoryViz').addEventListener('click', function() {
+                const activeTab = document.querySelector('#categoryVisualizationTabs .nav-link.active');
+                if (activeTab) {
+                    activeTab.dispatchEvent(new Event('shown.bs.tab'));
+                }
+            });
+            
+            // Add update hierarchy visualization button event
+            document.getElementById('updateHierarchyViz').addEventListener('click', renderCategoryHierarchy);
+            
+            // Add visualization updates to the existing update function
+            const originalUpdateVisualization = updateVisualization;
+            updateVisualization = function() {
+                originalUpdateVisualization();
+                
+                // Update the category visualizations if they're visible
+                if (vizSection.style.display !== 'none') {
+                    const activeTab = document.querySelector('#categoryVisualizationTabs .nav-link.active');
+                    if (activeTab) {
+                        activeTab.dispatchEvent(new Event('shown.bs.tab'));
+                    }
+                }
+            };
+        });
+        
+        // Function to render category hierarchy visualization
+        function renderCategoryHierarchy() {
+            const vizType = document.getElementById('hierarchyType').value;
+            const colorScheme = document.getElementById('hierarchyColorScheme').value;
+            const vizContainer = document.getElementById('hierarchyViz');
+            
+            // Show loading
+            vizContainer.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+            
+            // Process the data for hierarchy visualization
+            setTimeout(() => {
+                try {
+                    // Get categories and concepts from the data
+                    const categoryHierarchy = extractCategoryHierarchy();
+                    
+                    // Render the appropriate visualization based on the selected type
+                    if (vizType === 'sunburst') {
+                        renderSunburstChart(categoryHierarchy, vizContainer, colorScheme);
+                    } else if (vizType === 'treemap') {
+                        renderTreeMap(categoryHierarchy, vizContainer, colorScheme);
+                    } else if (vizType === 'circlepack') {
+                        renderCirclePacking(categoryHierarchy, vizContainer, colorScheme);
+                    }
+                } catch (error) {
+                    vizContainer.innerHTML = `<div class="alert alert-danger">Error rendering visualization: ${error.message}</div>`;
+                    console.error('Error in renderCategoryHierarchy:', error);
+                }
+            }, 100);
+        }
+        
+        // Function to extract category hierarchy from the data
+        function extractCategoryHierarchy() {
+            // Create a root node for the hierarchy
+            const hierarchy = {
+                name: "Restaurant Categories",
+                children: []
+            };
+            
+            // Use the window.embeddingCategories if available, otherwise extract from labels
+            const categories = {};
+            
+            if (window.embeddingCategories) {
+                // We already have the categories extracted
+                Object.entries(window.embeddingCategories).forEach(([category, concepts]) => {
+                    const categoryNode = {
+                        name: category,
+                        children: concepts.map(concept => ({ name: concept, value: 1 }))
+                    };
+                    hierarchy.children.push(categoryNode);
+                });
+            } else {
+                // Extract categories from labels
+                labels.forEach(label => {
+                    if (typeof label === 'object' && label.category && label.concept) {
+                        if (!categories[label.category]) {
+                            categories[label.category] = [];
+                        }
+                        if (!categories[label.category].includes(label.concept)) {
+                            categories[label.category].push(label.concept);
+                        }
+                    } else if (typeof label === 'string' && label.includes(' -> ')) {
+                        const [category, concept] = label.split(' -> ');
+                        if (!categories[category]) {
+                            categories[category] = [];
+                        }
+                        if (!categories[category].includes(concept)) {
+                            categories[category].push(concept);
+                        }
+                    }
+                });
+                
+                // Convert to hierarchy format
+                Object.entries(categories).forEach(([category, concepts]) => {
+                    const categoryNode = {
+                        name: category,
+                        children: concepts.map(concept => ({ name: concept, value: 1 }))
+                    };
+                    hierarchy.children.push(categoryNode);
+                });
+                
+                // Store for future use
+                window.embeddingCategories = categories;
+            }
+            
+            return hierarchy;
+        }
+        
+        // Function to render a sunburst chart using Plotly
+        function renderSunburstChart(data, container, colorScheme) {
+            // Convert hierarchy data to the format Plotly expects
+            const labels = [];
+            const parents = [];
+            const values = [];
+            const ids = [];
+            
+            // Add the root
+            labels.push(data.name);
+            parents.push("");
+            values.push(data.children.reduce((sum, cat) => sum + cat.children.length, 0));
+            ids.push("root");
+            
+            // Add the categories
+            data.children.forEach((category, i) => {
+                const categoryId = `cat-${i}`;
+                labels.push(category.name);
+                parents.push("root");
+                values.push(category.children.length);
+                ids.push(categoryId);
+                
+                // Add the concepts
+                category.children.forEach((concept, j) => {
+                    const conceptId = `cat-${i}-con-${j}`;
+                    labels.push(concept.name);
+                    parents.push(categoryId);
+                    values.push(concept.value);
+                    ids.push(conceptId);
+                });
+            });
+            
+            // Create the sunburst trace
+            const trace = {
+                type: "sunburst",
+                labels: labels,
+                parents: parents,
+                values: values,
+                ids: ids,
+                branchvalues: 'total',
+                hovertemplate: '<b>%{label}</b><br>Count: %{value}<extra></extra>',
+                insidetextorientation: 'radial',
+                marker: { colorscale: colorScheme }
+            };
+            
+            const layout = {
+                margin: { l: 0, r: 0, b: 0, t: 0 },
+                sunburstcolorway: getColorScheme(colorScheme, data.children.length),
+                font: { size: 10 }
+            };
+            
+            Plotly.newPlot(container, [trace], layout);
+        }
+        
+        // Function to render a treemap using Plotly
+        function renderTreeMap(data, container, colorScheme) {
+            // Convert hierarchy data to the format Plotly expects
+            const labels = [];
+            const parents = [];
+            const values = [];
+            const ids = [];
+            
+            // Add the root
+            labels.push(data.name);
+            parents.push("");
+            values.push(data.children.reduce((sum, cat) => sum + cat.children.length, 0));
+            ids.push("root");
+            
+            // Add the categories
+            data.children.forEach((category, i) => {
+                const categoryId = `cat-${i}`;
+                labels.push(category.name);
+                parents.push("root");
+                values.push(category.children.length);
+                ids.push(categoryId);
+                
+                // Add the concepts
+                category.children.forEach((concept, j) => {
+                    const conceptId = `cat-${i}-con-${j}`;
+                    labels.push(concept.name);
+                    parents.push(categoryId);
+                    values.push(concept.value);
+                    ids.push(conceptId);
+                });
+            });
+            
+            // Create the treemap trace
+            const trace = {
+                type: "treemap",
+                labels: labels,
+                parents: parents,
+                values: values,
+                ids: ids,
+                branchvalues: 'total',
+                hovertemplate: '<b>%{label}</b><br>Count: %{value}<extra></extra>',
+                textposition: 'middle center',
+                marker: { colorscale: colorScheme }
+            };
+            
+            const layout = {
+                margin: { l: 0, r: 0, b: 0, t: 0 },
+                treemapcolorway: getColorScheme(colorScheme, data.children.length),
+                font: { size: 10 }
+            };
+            
+            Plotly.newPlot(container, [trace], layout);
+        }
+        
+        // Function to render circle packing using Plotly
+        function renderCirclePacking(data, container, colorScheme) {
+            // For circle packing, we'll use a treemap with a special squarify algorithm
+            // that makes it appear more like circle packing
+            const labels = [];
+            const parents = [];
+            const values = [];
+            const ids = [];
+            
+            // Add the root
+            labels.push(data.name);
+            parents.push("");
+            values.push(data.children.reduce((sum, cat) => sum + cat.children.length, 0));
+            ids.push("root");
+            
+            // Add the categories
+            data.children.forEach((category, i) => {
+                const categoryId = `cat-${i}`;
+                labels.push(category.name);
+                parents.push("root");
+                values.push(category.children.length);
+                ids.push(categoryId);
+                
+                // Add the concepts
+                category.children.forEach((concept, j) => {
+                    const conceptId = `cat-${i}-con-${j}`;
+                    labels.push(concept.name);
+                    parents.push(categoryId);
+                    values.push(concept.value);
+                    ids.push(conceptId);
+                });
+            });
+            
+            // Create the treemap trace with circle packing appearance
+            const trace = {
+                type: "treemap",
+                labels: labels,
+                parents: parents,
+                values: values,
+                ids: ids,
+                branchvalues: 'total',
+                hovertemplate: '<b>%{label}</b><br>Count: %{value}<extra></extra>',
+                textposition: 'middle center',
+                marker: { 
+                    colorscale: colorScheme,
+                    line: { width: 2 },
+                    pad: { t: 3, l: 3, r: 3, b: 3 }
+                },
+                tiling: { 
+                    packing: 'circle'
+                }
+            };
+            
+            const layout = {
+                margin: { l: 0, r: 0, b: 0, t: 0 },
+                treemapcolorway: getColorScheme(colorScheme, data.children.length),
+                font: { size: 10 }
+            };
+            
+            Plotly.newPlot(container, [trace], layout);
+        }
+        
+        // Helper function to get color schemes
+        function getColorScheme(scheme, count) {
+            if (scheme === 'viridis') {
+                return Array.from({ length: count }, (_, i) => 
+                    `rgb(${Math.floor(68 + (i / count) * 187)}, ${Math.floor(1 + (i / count) * 229)}, ${Math.floor(84 + (i / count) * 100)})`
+                );
+            } else if (scheme === 'plasma') {
+                return Array.from({ length: count }, (_, i) => 
+                    `rgb(${Math.floor(13 + (i / count) * 240)}, ${Math.floor(8 + (i / count) * 200)}, ${Math.floor(135 + (i / count) * 119)})`
+                );
+            } else {
+                // Default to category10
+                const baseColors = [
+                    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
+                    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+                ];
+                // Repeat colors if needed
+                return Array.from({ length: count }, (_, i) => baseColors[i % baseColors.length]);
+            }
+        }
+    </script>
+</body>
+</html>

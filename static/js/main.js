@@ -209,6 +209,13 @@ document.addEventListener('DOMContentLoaded', function() {
         exportPdfBtn.classList.remove('d-none');
         if (exportPdfSidebarBtn) exportPdfSidebarBtn.classList.remove('d-none');
         if (exportPdfMobileBtn) exportPdfMobileBtn.classList.remove('d-none');
+        
+        // If we have embeddings data loaded, integrate it with the conversation data
+        if (window.embeddingsData && window.embeddingsData.loaded) {
+            console.log('Integrating embeddings data with conversation analysis');
+            // This is where you would use the embeddings data for enhanced analysis
+            // For now, we just log it's available
+        }
     }
     
     // Update summary statistics
@@ -335,6 +342,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const tab = document.getElementById(tabId);
         if (tab) {
             tab.click();
+        }
+    }
+    
+    // Initialize embeddings upload if present
+    if (document.getElementById('embeddings-upload-area')) {
+        console.log('Initializing embeddings upload functionality');
+        if (typeof initEmbeddingsUpload === 'function') {
+            initEmbeddingsUpload();
+        } else {
+            console.warn('embeddings-parser.js script not loaded');
         }
     }
 });
