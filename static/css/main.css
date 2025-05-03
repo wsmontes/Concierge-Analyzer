@@ -183,7 +183,7 @@ body {
 
 .btn-icon:hover {
     background-color: var(--sidebar-item-hover);
-    color: var(--text-primary);
+    color: var(--sidebar-active-text);
 }
 
 /* Main Content Area */
@@ -196,7 +196,34 @@ body {
     transition: margin-left 0.3s ease;
 }
 
-/* Content Container adjusted to work with new header height */
+/* Top Navigation Bar */
+.top-navbar {
+    background-color: var(--header-bg);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+}
+
+.page-title h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.top-navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Content Container */
 .content-container {
     padding: 20px;
     flex: 1;
@@ -751,53 +778,44 @@ body {
 
 /* Simple Drop Area - Minimalist Styling */
 .simple-drop-container {
-    padding: 0;
-    margin: 0;
-    display: inline-block;
+    padding: 10px 15px;
+    margin-bottom: 15px;
 }
 
 .simple-drop-area {
     position: relative;
-    width: 36px;
-    height: 36px;
-    min-height: unset;
-    border: none;
-    border-radius: 50%;
+    min-height: 80px;
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s ease;
-    padding: 0;
-    background-color: transparent;
+    transition: all 0.3s;
+    padding: 12px;
+    background-color: var(--body-bg);
 }
 
-.simple-drop-area:hover {
-    background-color: var(--sidebar-item-hover);
-    border: none;
-}
-
+.simple-drop-area:hover,
 .simple-drop-area.dragover {
-    background-color: var(--sidebar-active-bg);
-    border: none;
+    border-color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.05);
 }
 
 .simple-drop-area .upload-placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
+    text-align: center;
 }
 
 .simple-drop-area .upload-placeholder i {
-    font-size: 1rem;
-    margin: 0;
+    font-size: 1.5rem;
     color: var(--text-secondary);
+    margin-bottom: 5px;
 }
 
-.simple-drop-area .upload-placeholder .micro-text {
-    display: none;
+.simple-drop-area .micro-text {
+    font-size: 0.7rem;
+    margin: 0 0 5px 0;
+    color: var(--text-secondary);
 }
 
 .simple-drop-area .file-input {
@@ -808,89 +826,28 @@ body {
     left: 0;
     opacity: 0;
     cursor: pointer;
-    z-index: 2;
 }
 
 .simple-drop-area .selected-file {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
     display: flex;
     align-items: center;
-    justify-content: center;
-    background-color: transparent;
-    border: none;
-    padding: 0;
+    width: 100%;
+    padding: 8px;
+    border-radius: 4px;
+    background-color: rgba(var(--bs-success-rgb), 0.05);
+    border: 1px solid rgba(var(--bs-success-rgb), 0.2);
 }
 
 .simple-drop-area .selected-file i {
-    font-size: 1rem;
+    font-size: 0.9rem;
     color: var(--bs-success);
-    margin: 0;
+    margin-right: 8px;
 }
 
 .simple-drop-area .selected-file .file-name {
-    display: none;
-}
-
-.simple-drop-area .selected-file button {
-    display: none;
-}
-
-/* Status indicators for icon drop area */
-#folder-status, #embeddings-status {
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: auto;
-    white-space: nowrap;
-    z-index: 10;
-    font-size: 0.7rem;
-    background-color: var(--card-bg);
-    border-radius: 4px;
-    padding: 2px 5px;
-    box-shadow: var(--card-shadow);
-    margin-top: 3px;
-    display: none;
-}
-
-#folder-status.visible, #embeddings-status.visible {
-    display: block;
-}
-
-/* Tooltip styling for icon drop areas */
-.simple-drop-area:hover::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    bottom: -25px;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: var(--card-bg);
+    flex-grow: 1;
+    margin: 0;
     color: var(--text-primary);
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    box-shadow: var(--card-shadow);
-    white-space: nowrap;
-    z-index: 100;
-}
-
-/* Keep the header uploads container as a flex row of icons */
-.header-uploads-container {
-    flex-grow: 0;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 5px;
-    margin-right: 10px;
-}
-
-.header-upload-item {
-    max-width: unset;
-    min-width: unset;
 }
 
 /* Embeddings Upload Form Styles */
@@ -1131,14 +1088,14 @@ body {
 
 /* Lotier Logo styling */
 .lotier-logo {
-    height: 40px;
+    height: 80px; /* Increased from 40px */
     max-width: 100%;
     object-fit: contain;
-    margin: 0;
+    margin-right: 0px; /* Added margin for spacing */
 }
 
 .sidebar .lotier-logo {
-    height: 40px;
-    margin-bottom: 0;
-    max-width: 90%;
+    height: 90px; /* Increased from 30px */
+    margin-bottom: 0px;
+    max-width: 90%; /* Ensure it fits well in the sidebar */
 }

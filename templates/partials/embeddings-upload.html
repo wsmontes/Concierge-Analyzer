@@ -3,22 +3,22 @@
   Provides streamlined interface for uploading embeddings JSON files
   Dependencies: embeddings-parser.js for processing logic
 -->
-<div class="simple-drop-container">
-    <div class="simple-drop-area" data-tooltip="Upload Embeddings">
+<div class="simple-drop-container mt-3">
+    <div class="simple-drop-area" id="embeddings-upload-area">
+        <input type="file" id="embeddings-file" class="file-input" accept=".json">
         <div class="upload-placeholder">
-            <i class="bi bi-diagram-3"></i>
-            <span class="micro-text">Embeddings</span>
+            <i class="bi bi-cloud-arrow-up"></i>
+            <p class="micro-text">Drop embeddings JSON file (optional)</p>
         </div>
-        <input type="file" class="file-input" id="embeddings-file" accept=".json">
-        <div class="selected-file" style="display: none;">
-            <i class="bi bi-check-circle-fill"></i>
-            <p class="file-name"></p>
-            <button class="btn btn-sm btn-icon remove-file">
-                <i class="bi bi-x"></i>
+        <div class="selected-file d-none" id="embeddings-selected-file">
+            <i class="bi bi-filetype-json"></i>
+            <p class="file-name micro-text text-truncate"></p>
+            <button type="button" class="btn btn-link btn-sm p-0 text-danger" id="embeddings-remove-file">
+                <i class="bi bi-x-circle"></i>
             </button>
         </div>
     </div>
-    <div id="embeddings-status" class="d-none">
+    <div id="embeddings-status" class="mt-2 d-none small">
         <!-- Status messages will appear here -->
     </div>
 </div>
