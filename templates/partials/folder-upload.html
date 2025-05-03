@@ -3,16 +3,19 @@
   Provides streamlined interface for uploading restaurant data folders
   Dependencies: restaurant-visualizer.js for processing logic
 -->
-<div class="simple-drop-container mt-3">
+<div class="simple-drop-container">
     <div class="simple-drop-area" id="folder-upload-area">
         <input type="file" id="folder-input" class="file-input" webkitdirectory directory multiple>
+        <div class="icon-only-container">
+            <i class="bi bi-folder-plus"></i>
+        </div>
         <div class="upload-placeholder">
             <i class="bi bi-folder-plus"></i>
-            <p class="micro-text">Drop restaurant data folder (optional)</p>
+            <span class="micro-text">Restaurant data folder</span>
         </div>
         <div class="selected-file d-none" id="folder-selected-file">
             <i class="bi bi-folder-check"></i>
-            <p class="file-name micro-text text-truncate"></p>
+            <span class="file-name micro-text text-truncate"></span>
             <button type="button" class="btn btn-link btn-sm p-0 text-danger" id="folder-remove-file">
                 <i class="bi bi-x-circle"></i>
             </button>

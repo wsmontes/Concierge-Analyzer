@@ -357,3 +357,124 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+/**
+ * Main application utilities for Concierge Analyzer
+ * Provides global initialization, DOM helpers, and utility functions
+ */
+
+// Namespace for global utilities
+window.ConciergeUtils = {
+    // Check if an element exists in the DOM
+    elementExists: function(selector) {
+        return document.querySelector(selector) !== null;
+    },
+    
+    // Safe querySelector that checks existence
+    getSafeElement: function(selector) {
+        const element = document.querySelector(selector);
+        if (!element) {
+            console.warn(`Element not found: ${selector}`);
+        }
+        return element;
+    },
+    
+    // Wait for an element to appear in the DOM
+    // Returns a promise that resolves with the element
+    waitForElement: function(selector, timeout = 2000) {
+        return new Promise((resolve, reject) => {
+            if (document.querySelector(selector)) {
+                return resolve(document.querySelector(selector));
+            }
+            
+            const observer = new MutationObserver((mutations) => {
+                if (document.querySelector(selector)) {
+                    resolve(document.querySelector(selector));
+                    observer.disconnect();
+                }
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+            
+            // Set timeout
+            setTimeout(() => {
+                observer.disconnect();
+                reject(`Timeout waiting for ${selector}`);
+            }, timeout);
+        });
+    },
+    
+    // Create an error message element
+    createErrorMessage: function(message, type = 'warning') {
+        const div = document.createElement('div');
+        div.className = `alert alert-${type} mt-2`;
+        div.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2"></i>${message}`;
+        return div;
+    },
+    
+    // Safely initialize a Chart.js chart with error handling
+    initializeChart: function(canvasId, chartConfig) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) {
+            console.warn(`Canvas element '${canvasId}' not found`);
+            return null;
+        }
+        
+        try {
+            // Destroy existing chart if present
+            const existingChart = Chart.getChart(canvas);
+            if (existingChart) {
+                existingChart.destroy();
+            }
+            
+            // Create and return new chart
+            return new Chart(canvas, chartConfig);
+        } catch (error) {
+            console.error(`Error creating chart on '${canvasId}':`, error);
+            
+            // Try to display error in canvas parent
+            const parent = canvas.parentElement;
+            if (parent) {
+                canvas.style.display = 'none'; // Hide the canvas
+                parent.appendChild(this.createErrorMessage(`Error creating chart: ${error.message}`, 'danger'));
+            }
+            return null;
+        }
+    },
+    
+    // Initialize library dependencies and check availability
+    checkDependencies: function() {
+        const dependencies = {
+            'Chart.js': typeof Chart !== 'undefined',
+            'Plotly.js': typeof Plotly !== 'undefined',
+            'Bootstrap': typeof bootstrap !== 'undefined'
+        };
+        
+        console.log('Dependency check:', dependencies);
+        
+        // Return missing dependencies
+        return Object.entries(dependencies)
+            .filter(([, available]) => !available)
+            .map(([name]) => name);
+    }
+};
+
+// Initialize after the DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Main application initializing');
+    
+    // Check dependencies
+    const missingDeps = ConciergeUtils.checkDependencies();
+    if (missingDeps.length > 0) {
+        console.warn('Missing dependencies:', missingDeps.join(', '));
+    }
+    
+    // Add global error handler for charts
+    if (typeof Chart !== 'undefined') {
+        Chart.defaults.plugins.title.font.size = 14;
+        Chart.defaults.font.family = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+    }
+});

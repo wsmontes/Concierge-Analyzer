@@ -7,13 +7,16 @@
     <form id="upload-form" enctype="multipart/form-data" method="post">
         <div class="simple-drop-area" id="upload-area">
             <input type="file" id="chat-file" name="file" class="file-input" accept=".txt" required>
+            <div class="icon-only-container">
+                <i class="bi bi-cloud-arrow-up"></i>
+            </div>
             <div class="upload-placeholder">
                 <i class="bi bi-cloud-arrow-up"></i>
-                <p class="micro-text">Drop WhatsApp chat file here</p>
+                <span class="micro-text">WhatsApp chat file</span>
             </div>
             <div class="selected-file d-none" id="selected-file">
                 <i class="bi bi-file-text"></i>
-                <p class="file-name micro-text text-truncate"></p>
+                <span class="file-name micro-text text-truncate"></span>
                 <button type="button" class="btn btn-link btn-sm p-0 text-danger" id="remove-file">
                     <i class="bi bi-x-circle"></i>
                 </button>

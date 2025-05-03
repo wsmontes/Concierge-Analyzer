@@ -18,13 +18,19 @@ window.restaurantData = {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Initializing Restaurant Visualizer module');
     
-    // First wait for DOM content to be loaded
-    // Then wait for an additional short delay to ensure all elements are rendered
-    setTimeout(safeInit, 500);
+    // Use a longer delay to ensure all elements are properly rendered
+    // This helps prevent "element not found" errors in complex layouts
+    setTimeout(safeInit, 800);
 });
 
 // Safe initialization with multiple fallbacks
 function safeInit() {
+    // Check if Plotly is available before proceeding
+    if (typeof Plotly === 'undefined') {
+        console.warn('Plotly.js is not loaded. Some visualizations may not work properly.');
+        // Continue anyway, individual visualizations will check again
+    }
+    
     // Explicitly initialize visualizations first (doesn't depend on uploads)
     initRestaurantVisualization();
     
@@ -350,8 +356,68 @@ function setupFolderUploadHandlers(uploadArea, folderInput) {
 // Initialize restaurant visualization components
 function initRestaurantVisualization() {
     console.log('Setting up restaurant visualization components');
-    // Implementation for visualization setup
-    // ...
+    
+    try {
+        // First check if the visualization tabs exist at all
+        const tabsContainer = document.getElementById('restaurantVisualizationTabs');
+        if (!tabsContainer) {
+            console.warn('Restaurant visualization tabs not found in the DOM');
+            return; // Exit early if the container isn't available
+        }
+        
+        // Initialize tabs with proper error handling
+        initVisualizationTabs();
+        
+        // Set up event handlers for the similarity visualization options
+        const updateSimilarityBtn = document.getElementById('updateSimilarityViz');
+        if (updateSimilarityBtn) {
+            updateSimilarityBtn.addEventListener('click', renderSimilarityVisualization);
+        }
+        
+        // Set up event handlers for the clustering visualization options
+        const updateClusteringBtn = document.getElementById('updateClusteringViz');
+        if (updateClusteringBtn) {
+            updateClusteringBtn.addEventListener('click', function() {
+                const method = document.getElementById('clusteringMethod')?.value || 'automatic';
+                if (method === 'category') {
+                    renderClusteringByCategoryVisualization();
+                } else {
+                    renderClusteringVisualization();
+                }
+            });
+        }
+        
+        // Set up clustering method change handler
+        const clusteringMethod = document.getElementById('clusteringMethod');
+        if (clusteringMethod) {
+            clusteringMethod.addEventListener('change', function() {
+                if (this.value === 'category') {
+                    renderClusteringByCategoryVisualization();
+                } else {
+                    renderClusteringVisualization();
+                }
+            });
+        }
+        
+        // Set up initial visualization based on active tab
+        const activeTab = document.querySelector('#restaurantVisualizationTabs .nav-link.active');
+        if (activeTab) {
+            const targetId = activeTab.getAttribute('data-bs-target')?.substring(1);
+            if (targetId === 'hierarchy') {
+                renderCategoryHierarchy();
+            } else if (targetId === 'similarity') {
+                renderSimilarityVisualization();
+            } else if (targetId === 'distribution') {
+                renderDistributionVisualization();
+            } else if (targetId === 'clustering') {
+                renderClusteringVisualization();
+            }
+        }
+        
+        console.log('Restaurant visualization components initialized successfully');
+    } catch (error) {
+        console.error('Error initializing restaurant visualization:', error);
+    }
 }
 
 // Initialize visualization tabs
@@ -382,7 +448,9 @@ function initVisualizationTabs() {
         refreshBtn.addEventListener('click', function() {
             const activeTab = document.querySelector('#restaurantVisualizationTabs .nav-link.active');
             if (activeTab) {
+                // Trigger tab event to refresh visualization
                 activeTab.dispatchEvent(new Event('shown.bs.tab'));
+                showNotification('Visualization refreshed', 'success');
             }
         });
     }
@@ -392,63 +460,130 @@ function initVisualizationTabs() {
     if (updateBtn) {
         updateBtn.addEventListener('click', renderCategoryHierarchy);
     }
+    
+    // Add color scheme change event
+    const colorSchemeSelect = document.getElementById('hierarchyColorScheme');
+    if (colorSchemeSelect) {
+        colorSchemeSelect.addEventListener('change', function() {
+            const hierarchyType = document.getElementById('hierarchyType')?.value || 'sunburst';
+            if (hierarchyType === document.getElementById('hierarchyType')?.value) {
+                renderCategoryHierarchy();
+            }
+        });
+    }
 }
 
 // Update restaurant metrics
 function updateRestaurantMetrics() {
     if (!window.restaurantData.loaded) return;
     
-    const { vectors, categories } = window.restaurantData;
-    
-    // Update metrics
-    if (vectors.length > 0) {
-        document.getElementById('dimensions').textContent = vectors[0].length;
-        document.getElementById('dataPoints').textContent = vectors.length;
-        document.getElementById('categoryCount').textContent = Object.keys(categories).length;
+    try {
+        const { vectors, categories } = window.restaurantData;
         
-        // Count total concepts
-        const totalConcepts = Object.values(categories).reduce((sum, arr) => sum + arr.length, 0);
-        document.getElementById('conceptCount').textContent = totalConcepts;
+        // Get element references
+        const dimensionsEl = document.getElementById('dimensions');
+        const dataPointsEl = document.getElementById('dataPoints');
+        const categoryCountEl = document.getElementById('categoryCount');
+        const conceptCountEl = document.getElementById('conceptCount');
         
-        // Show category breakdown section
-        const breakdownSection = document.getElementById('categoryBreakdownSection');
-        if (breakdownSection) {
-            breakdownSection.classList.remove('d-none');
+        // Update metrics with null checks
+        if (vectors && vectors.length > 0 && vectors[0]) {
+            if (dimensionsEl) dimensionsEl.textContent = vectors[0].length || '-';
+            if (dataPointsEl) dataPointsEl.textContent = vectors.length || '-';
         }
         
-        // Populate category table
-        const categoryTable = document.getElementById('categoryTable');
-        if (categoryTable) {
-            categoryTable.innerHTML = '';
+        if (categories) {
+            if (categoryCountEl) categoryCountEl.textContent = Object.keys(categories).length || '-';
             
-            Object.entries(categories).forEach(([category, concepts]) => {
-                const percentage = ((concepts.length / totalConcepts) * 100).toFixed(1);
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${category}</td>
-                    <td>${concepts.length}</td>
-                    <td>${percentage}%</td>
-                `;
-                categoryTable.appendChild(row);
-            });
+            // Count total concepts with error checking
+            let totalConcepts = 0;
+            try {
+                totalConcepts = Object.values(categories).reduce((sum, arr) => {
+                    // Check if the value is an array before adding its length
+                    return sum + (Array.isArray(arr) ? arr.length : 0);
+                }, 0);
+            } catch (e) {
+                console.warn('Error calculating total concepts:', e);
+            }
+            
+            if (conceptCountEl) conceptCountEl.textContent = totalConcepts || '-';
+            
+            // Show category breakdown section
+            const breakdownSection = document.getElementById('categoryBreakdownSection');
+            if (breakdownSection) {
+                if (totalConcepts > 0) {
+                    breakdownSection.classList.remove('d-none');
+                } else {
+                    breakdownSection.classList.add('d-none');
+                    return; // Exit early if no concepts to display
+                }
+            }
+            
+            // Populate category table
+            const categoryTable = document.getElementById('categoryTable');
+            if (categoryTable) {
+                categoryTable.innerHTML = '';
+                
+                Object.entries(categories).forEach(([category, concepts]) => {
+                    if (!Array.isArray(concepts)) {
+                        console.warn(`Concepts for category ${category} is not an array`);
+                        return; // Skip this category
+                    }
+                    
+                    const percentage = ((concepts.length / totalConcepts) * 100).toFixed(1);
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${category}</td>
+                        <td>${concepts.length}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                                    <div class="progress-bar" role="progressbar" style="width: ${percentage}%" 
+                                        aria-valuenow="${percentage}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <span>${percentage}%</span>
+                            </div>
+                        </td>
+                    `;
+                    categoryTable.appendChild(row);
+                });
+            }
         }
+    } catch (error) {
+        console.error('Error updating restaurant metrics:', error);
     }
 }
 
 // Render category hierarchy visualization
 function renderCategoryHierarchy() {
-    if (!window.restaurantData.loaded) return;
+    if (!window.restaurantData.loaded) {
+        const vizContainer = document.getElementById('hierarchyViz');
+        if (vizContainer) {
+            vizContainer.innerHTML = '<div class="alert alert-info">No restaurant data loaded. Please upload restaurant data files first.</div>';
+        }
+        return;
+    }
     
-    const vizType = document.getElementById('hierarchyType')?.value || 'sunburst';
-    const colorScheme = document.getElementById('hierarchyColorScheme')?.value || 'viridis';
     const vizContainer = document.getElementById('hierarchyViz');
-    
-    if (!vizContainer) return;
+    if (!vizContainer) {
+        console.error('Hierarchy visualization container not found');
+        return;
+    }
     
     // Show loading indicator
     vizContainer.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border text-primary" role="status"></div><span class="ms-2">Loading visualization...</span></div>';
     
-    // Process the data for hierarchy visualization
+    // Check for Plotly availability before proceeding
+    if (typeof Plotly === 'undefined') {
+        vizContainer.innerHTML = '<div class="alert alert-warning">Plotly.js is required for visualizations. Please check your internet connection and reload the page.</div>';
+        return;
+    }
+    
+    // Get visualization options with fallbacks
+    const vizType = document.getElementById('hierarchyType')?.value || 'sunburst';
+    const colorScheme = document.getElementById('hierarchyColorScheme')?.value || 'viridis';
+    
+    // Process the data for hierarchy visualization with a delay to ensure DOM is ready
     setTimeout(() => {
         try {
             // Extract category hierarchy data
@@ -457,7 +592,17 @@ function renderCategoryHierarchy() {
                 children: []
             };
             
+            if (!window.restaurantData.categories || Object.keys(window.restaurantData.categories).length === 0) {
+                vizContainer.innerHTML = '<div class="alert alert-warning">No category data available. The uploaded files may not contain properly formatted category information.</div>';
+                return;
+            }
+            
             Object.entries(window.restaurantData.categories).forEach(([category, concepts]) => {
+                if (!concepts || !Array.isArray(concepts) || concepts.length === 0) {
+                    console.warn(`Category ${category} has no concepts or invalid data format`);
+                    return; // Skip this category
+                }
+                
                 const categoryNode = {
                     name: category,
                     children: concepts.map(concept => ({ name: concept, value: 1 }))
@@ -473,15 +618,22 @@ function renderCategoryHierarchy() {
                     renderTreeMap(hierarchyData, vizContainer, colorScheme);
                 } else if (vizType === 'circlepack') {
                     renderCirclePacking(hierarchyData, vizContainer, colorScheme);
-                }
+                }  // Fixed: Added missing closing brace for the if-else chain
+                
+                // Add export button after successful visualization
+                addExportButton(vizContainer, 'hierarchy-export-btn', 'Restaurant Categories');
             } else {
-                vizContainer.innerHTML = '<div class="alert alert-warning">Plotly.js is required for visualizations</div>';
+                vizContainer.innerHTML = '<div class="alert alert-warning">Plotly.js is required for visualizations. Please check your internet connection and reload the page.</div>';
             }
         } catch (error) {
-            vizContainer.innerHTML = `<div class="alert alert-danger">Error rendering visualization: ${error.message}</div>`;
+            vizContainer.innerHTML = `<div class="alert alert-danger">
+                <h6><i class="bi bi-exclamation-triangle me-2"></i>Error rendering visualization</h6>
+                <p class="mb-0">${error.message}</p>
+                <button class="btn btn-sm btn-outline-danger mt-2" onclick="renderCategoryHierarchy()">Try Again</button>
+            </div>`;
             console.error('Error in renderCategoryHierarchy:', error);
         }
-    }, 100);
+    }, 300); // Increased delay from 100ms to 300ms for better DOM readiness
 }
 
 // Render sunburst chart using Plotly
@@ -524,18 +676,38 @@ function renderSunburstChart(data, container, colorScheme) {
         values: values,
         ids: ids,
         branchvalues: 'total',
-        hovertemplate: '<b>%{label}</b><br>Count: %{value}<extra></extra>',
+        hovertemplate: '<b>%{label}</b><br>Count: %{value}<br>Percentage: %{percentEntry:.1%}<extra></extra>',
         insidetextorientation: 'radial',
-        marker: { colorscale: colorScheme }
+        marker: { 
+            colorscale: colorScheme,
+            line: { width: 0.5, color: '#fff' } // Add thin white borders for better separation
+        }
     };
     
     const layout = {
         margin: { l: 0, r: 0, b: 0, t: 0 },
         sunburstcolorway: getColorScheme(colorScheme, data.children.length),
-        font: { size: 10 }
+        font: { size: 10 },
+        hoverlabel: { font: { size: 12 } }
     };
     
-    Plotly.newPlot(container, [trace], layout, { responsive: true });
+    const config = {
+        responsive: true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toggleSpikelines'],
+        toImageButtonOptions: {
+            format: 'png',
+            filename: 'restaurant-categories-sunburst',
+            height: 800,
+            width: 800,
+            scale: 2
+        }
+    };
+    
+    Plotly.newPlot(container, [trace], layout, config);
+    
+    // Store the visualization type in the global data object
+    window.restaurantData.currentVisualization = 'sunburst';
 }
 
 // Render treemap using Plotly
@@ -578,18 +750,38 @@ function renderTreeMap(data, container, colorScheme) {
         values: values,
         ids: ids,
         branchvalues: 'total',
-        hovertemplate: '<b>%{label}</b><br>Count: %{value}<extra></extra>',
+        hovertemplate: '<b>%{label}</b><br>Count: %{value}<br>Percentage: %{percentEntry:.1%}<extra></extra>',
         textposition: 'middle center',
-        marker: { colorscale: colorScheme }
+        marker: { 
+            colorscale: colorScheme,
+            line: { width: 1, color: '#fff' } // Add white borders for better separation
+        }
     };
     
     const layout = {
         margin: { l: 0, r: 0, b: 0, t: 0 },
         treemapcolorway: getColorScheme(colorScheme, data.children.length),
-        font: { size: 10 }
+        font: { size: 10 },
+        hoverlabel: { font: { size: 12 } }
     };
     
-    Plotly.newPlot(container, [trace], layout, { responsive: true });
+    const config = {
+        responsive: true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toggleSpikelines'],
+        toImageButtonOptions: {
+            format: 'png',
+            filename: 'restaurant-categories-treemap',
+            height: 800,
+            width: 800,
+            scale: 2
+        }
+    };
+    
+    Plotly.newPlot(container, [trace], layout, config);
+    
+    // Store the visualization type in the global data object
+    window.restaurantData.currentVisualization = 'treemap';
 }
 
 // Render circle packing using Plotly
@@ -633,11 +825,11 @@ function renderCirclePacking(data, container, colorScheme) {
         values: values,
         ids: ids,
         branchvalues: 'total',
-        hovertemplate: '<b>%{label}</b><br>Count: %{value}<extra></extra>',
+        hovertemplate: '<b>%{label}</b><br>Count: %{value}<br>Percentage: %{percentEntry:.1%}<extra></extra>',
         textposition: 'middle center',
         marker: { 
             colorscale: colorScheme,
-            line: { width: 2 },
+            line: { width: 2, color: '#fff' }, // Add white borders for better separation
             pad: { t: 3, l: 3, r: 3, b: 3 }
         },
         tiling: { 
@@ -648,10 +840,83 @@ function renderCirclePacking(data, container, colorScheme) {
     const layout = {
         margin: { l: 0, r: 0, b: 0, t: 0 },
         treemapcolorway: getColorScheme(colorScheme, data.children.length),
-        font: { size: 10 }
+        font: { size: 10 },
+        hoverlabel: { font: { size: 12 } }
     };
     
-    Plotly.newPlot(container, [trace], layout, { responsive: true });
+    const config = {
+        responsive: true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toggleSpikelines'],
+        toImageButtonOptions: {
+            format: 'png',
+            filename: 'restaurant-categories-circlepack',
+            height: 800,
+            width: 800,
+            scale: 2
+        }
+    };
+    
+    Plotly.newPlot(container, [trace], layout, config);
+    
+    // Store the visualization type in the global data object
+    window.restaurantData.currentVisualization = 'circlepack';
+}
+
+// Add export button to visualization container
+function addExportButton(container, buttonId, titlePrefix) {
+    // Check if button already exists to avoid duplicates
+    const existingButton = document.getElementById(buttonId);
+    if (existingButton) {
+        return;
+    }
+    
+    // Create export button container
+    const exportButtonContainer = document.createElement('div');
+    exportButtonContainer.className = 'position-absolute top-0 end-0 m-2';
+    
+    // Create export button
+    const exportButton = document.createElement('button');
+    exportButton.id = buttonId;
+    exportButton.className = 'btn btn-sm btn-outline-primary';
+    exportButton.innerHTML = '<i class="bi bi-download me-1"></i>Export';
+    exportButton.title = 'Download visualization as PNG';
+    exportButton.addEventListener('click', function() {
+        // Get the current date for filename
+        const date = new Date();
+        const dateString = date.toISOString().split('T')[0];
+        
+        // Get current visualization type
+        const vizType = window.restaurantData.currentVisualization || 'visualization';
+        
+        // Generate filename
+        const filename = `${titlePrefix.toLowerCase().replace(/\s+/g, '-')}-${vizType}-${dateString}`;
+        
+        // Use Plotly's toImage function to download the visualization
+        Plotly.toImage(container, {
+            format: 'png',
+            height: 800,
+            width: 800,
+            scale: 2,
+            filename: filename
+        }).then(function(dataUrl) {
+            // Create a download link
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `${filename}.png`;
+            link.click();
+        }).catch(function(error) {
+            console.error('Error exporting visualization:', error);
+            alert('Failed to export visualization. Please try again.');
+        });
+    });
+    
+    // Add button to container
+    exportButtonContainer.appendChild(exportButton);
+    
+    // Add container to visualization container
+    container.style.position = 'relative'; // Ensure container is positioned
+    container.appendChild(exportButtonContainer);
 }
 
 // Helper function to get color schemes
@@ -675,41 +940,852 @@ function getColorScheme(scheme, count) {
     }
 }
 
+// Enhanced placeholder functions for better user experience
 // Placeholder function for similarity visualization
 function renderSimilarityVisualization() {
     const vizContainer = document.getElementById('similarityViz');
     if (!vizContainer) return;
     
     if (!window.restaurantData.loaded) {
-        vizContainer.innerHTML = '<div class="alert alert-info">No restaurant data loaded</div>';
+        vizContainer.innerHTML = '<div class="alert alert-info">No restaurant data loaded. Please upload restaurant data files first.</div>';
         return;
     }
     
-    vizContainer.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="alert alert-info">Similarity visualization will be implemented in a future update</div></div>';
-}
-
-// Placeholder function for distribution visualization
-function renderDistributionVisualization() {
-    const vizContainer = document.getElementById('distributionViz');
-    if (!vizContainer) return;
+    // Show loading indicator
+    vizContainer.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border text-primary" role="status"></div><span class="ms-2">Loading semantic analysis...</span></div>';
     
-    if (!window.restaurantData.loaded) {
-        vizContainer.innerHTML = '<div class="alert alert-info">No restaurant data loaded</div>';
+    // Check for Plotly availability before proceeding
+    if (typeof Plotly === 'undefined') {
+        vizContainer.innerHTML = '<div class="alert alert-warning">Plotly.js is required for visualizations. Please check your internet connection and reload the page.</div>';
         return;
     }
     
-    vizContainer.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="alert alert-info">Distribution visualization will be implemented in a future update</div></div>';
+    setTimeout(() => {
+        try {
+            const { vectors, labels, categories } = window.restaurantData;
+            
+            if (vectors.length === 0) {
+                vizContainer.innerHTML = '<div class="alert alert-warning">No vector data available for visualization.</div>';
+                return;
+            }
+            
+            // Perform dimensionality reduction for 2D visualization
+            // We'll use a simplified t-SNE approach for browser performance
+            const embeddingPoints = performDimensionalityReduction(vectors);
+            
+            // Group points by category
+            const categoryColors = getColorScheme('category10', Object.keys(categories).length);
+            const categoryMap = {};
+            const traces = [];
+            
+            // Create a trace for each category
+            Object.keys(categories).forEach((category, i) => {
+                const points = [];
+                const text = [];
+                const concepts = categories[category] || [];
+                
+                // Collect all points for this category
+                labels.forEach((label, j) => {
+                    // Fix: Check if label is an object and access its properties correctly
+                    const labelCategory = typeof label === 'object' ? label.category : 
+                                         (typeof label === 'string' && label.includes(' -> ') ? 
+                                          label.split(' -> ')[0] : null);
+                    
+                    if (labelCategory === category) {
+                        const concept = typeof label === 'object' ? label.concept : 
+                                       (typeof label === 'string' && label.includes(' -> ') ? 
+                                        label.split(' -> ')[1] : label);
+                        
+                        if (concepts.includes(concept)) {
+                            points.push({
+                                x: embeddingPoints[j][0],
+                                y: embeddingPoints[j][1],
+                                label: concept
+                            });
+                            text.push(concept);
+                        }
+                    }
+                });
+                
+                if (points.length > 0) {
+                    traces.push({
+                        x: points.map(p => p.x),
+                        y: points.map(p => p.y),
+                        text: text,
+                        mode: 'markers',
+                        type: 'scatter',
+                        name: category,
+                        marker: {
+                            color: categoryColors[i % categoryColors.length],
+                            size: 10,
+                            opacity: 0.7,
+                            line: {
+                                color: 'white',
+                                width: 1
+                            }
+                        },
+                        hovertemplate: 
+                            '<b>%{text}</b><br>' +
+                            'Category: ' + category +
+                            '<extra></extra>'
+                    });
+                }
+            });
+            
+            // Layout configuration
+            const layout = {
+                title: {
+                    text: 'Concept Semantic Similarity',
+                    font: {
+                        size: 16
+                    }
+                },
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    yanchor: 'bottom',
+                    y: 1.02,
+                    xanchor: 'right',
+                    x: 1
+                },
+                hovermode: 'closest',
+                margin: { l: 40, r: 40, b: 40, t: 60 },
+                xaxis: {
+                    showticklabels: false,
+                    zeroline: false,
+                    title: 'Dimension 1'
+                },
+                yaxis: {
+                    showticklabels: false,
+                    zeroline: false,
+                    title: 'Dimension 2'
+                }
+            };
+            
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['lasso2d', 'toggleSpikelines'],
+                toImageButtonOptions: {
+                    format: 'png',
+                    filename: 'restaurant-concepts-similarity',
+                    height: 800,
+                    width: 800,
+                    scale: 2
+                }
+            };
+            
+            // Plot the visualization
+            Plotly.newPlot(vizContainer, traces, layout, config);
+            
+            // Add export button
+            addExportButton(vizContainer, 'similarity-export-btn', 'Concept Similarity'); 
+            
+            // Store the visualization type in the global data object
+            window.restaurantData.currentVisualization = 'similarity';
+            
+        } catch (error) {
+            vizContainer.innerHTML = `<div class="alert alert-danger">
+                <h6><i class="bi bi-exclamation-triangle me-2"></i>Error rendering similarity visualization</h6>
+                <p class="mb-0">${error.message}</p>
+                <button class="btn btn-sm btn-outline-danger mt-2" onclick="renderSimilarityVisualization()">Try Again</button>
+            </div>`;
+            console.error('Error in renderSimilarityVisualization:', error);
+        }
+    }, 300);
 }
 
-// Placeholder function for clustering visualization
+// Perform dimensionality reduction (simplified for browser)
+function performDimensionalityReduction(vectors) {
+    // If vectors are already 2D or less, return them directly
+    if (vectors.length === 0 || vectors[0].length <= 2) {
+        return vectors;
+    }
+    
+    // For high-dimensional vectors, use a simple PCA-like approach
+    // (A full t-SNE implementation would be too heavy for the browser)
+    const result = [];
+    const n = vectors.length;
+    
+    // Compute mean vector
+    const mean = new Array(vectors[0].length).fill(0);
+    for (let i = 0; i < n; i++) {
+        for (let j = 0; j < vectors[i].length; j++) {
+            mean[j] += vectors[i][j] / n;
+        }
+    }
+    
+    // Compute 2 principal directions (very simplified PCA)
+    // We'll use the first 2 vectors as basis and make them orthogonal
+    const basis1 = vectors[0].map((val, i) => val - mean[i]);
+    
+    // Find a vector that's most different from basis1
+    let maxDiff = -Infinity;
+    let basis2Index = 1;
+    for (let i = 1; i < n; i++) {
+        const diff = computeCosineDifference(
+            vectors[i].map((val, j) => val - mean[j]),
+            basis1
+        );
+        if (diff > maxDiff) {
+            maxDiff = diff;
+            basis2Index = i;
+        }
+    }
+    
+    const basis2Raw = vectors[basis2Index].map((val, i) => val - mean[i]);
+    
+    // Make basis2 orthogonal to basis1 using Gram-Schmidt
+    const dot = dotProduct(basis2Raw, basis1);
+    const basis1MagSq = dotProduct(basis1, basis1);
+    const basis2 = basis2Raw.map((val, i) => val - (dot / basis1MagSq) * basis1[i]);
+    
+    // Project all vectors onto the 2D subspace
+    for (let i = 0; i < n; i++) {
+        const centered = vectors[i].map((val, j) => val - mean[j]);
+        const proj1 = dotProduct(centered, basis1) / Math.sqrt(dotProduct(basis1, basis1));
+        const proj2 = dotProduct(centered, basis2) / Math.sqrt(dotProduct(basis2, basis2));
+        result.push([proj1, proj2]);
+    }
+    
+    return result;
+}
+
+// Helper function to compute dot product
+function dotProduct(vecA, vecB) {
+    return vecA.reduce((sum, val, i) => sum + val * vecB[i], 0);
+}
+
+// Helper function to compute cosine difference (1 - cosine similarity)
+function computeCosineDifference(vecA, vecB) {
+    const dotProd = dotProduct(vecA, vecB);
+    const magA = Math.sqrt(dotProduct(vecA, vecA));
+    const magB = Math.sqrt(dotProduct(vecB, vecB));
+    
+    if (magA === 0 || magB === 0) return 1; // Maximum difference if either vector is zero
+    return 1 - (dotProd / (magA * magB));
+}
+
+// Implementation of concept clustering visualization
 function renderClusteringVisualization() {
     const vizContainer = document.getElementById('clusteringViz');
     if (!vizContainer) return;
     
     if (!window.restaurantData.loaded) {
-        vizContainer.innerHTML = '<div class="alert alert-info">No restaurant data loaded</div>';
+        vizContainer.innerHTML = '<div class="alert alert-info">No restaurant data loaded. Please upload restaurant data files first.</div>';
         return;
     }
     
-    vizContainer.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="alert alert-info">Clustering visualization will be implemented in a future update</div></div>';
+    // Show loading indicator
+    vizContainer.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border text-primary" role="status"></div><span class="ms-2">Loading clustering analysis...</span></div>';
+    
+    // Check for Plotly availability before proceeding
+    if (typeof Plotly === 'undefined') {
+        vizContainer.innerHTML = '<div class="alert alert-warning">Plotly.js is required for visualizations. Please check your internet connection and reload the page.</div>';
+        return;
+    }
+    
+    setTimeout(() => {
+        try {
+            const { vectors, labels, categories } = window.restaurantData;
+            
+            if (vectors.length === 0) {
+                vizContainer.innerHTML = '<div class="alert alert-warning">No vector data available for visualization.</div>';
+                return;
+            }
+            
+            // Get all concepts across categories
+            const allConcepts = [];
+            Object.entries(categories).forEach(([category, concepts]) => {
+                if (Array.isArray(concepts)) {
+                    concepts.forEach(concept => {
+                        allConcepts.push({
+                            category,
+                            concept,
+                            vector: null
+                        });
+                    });
+                }
+            });
+            
+            // Match vectors to concepts
+            labels.forEach((label, i) => {
+                // Fix: Check if label is an object or string and handle accordingly
+                if (typeof label === 'object' && label.category && label.concept) {
+                    const conceptObj = allConcepts.find(c => 
+                        c.category === label.category && c.concept === label.concept);
+                    if (conceptObj) {
+                        conceptObj.vector = vectors[i];
+                    }
+                } else if (typeof label === 'string' && label.includes(' -> ')) {
+                    const [category, concept] = label.split(' -> ');
+                    const conceptObj = allConcepts.find(c => 
+                        c.category === category && c.concept === concept);
+                    if (conceptObj) {
+                        conceptObj.vector = vectors[i];
+                    }
+                }
+            });
+            
+            // Filter concepts that have vectors
+            const validConcepts = allConcepts.filter(c => c.vector !== null);
+            
+            if (validConcepts.length === 0) {
+                vizContainer.innerHTML = '<div class="alert alert-warning">No valid concept vectors found for clustering.</div>';
+                return;
+            }
+            
+            // Perform dimensionality reduction for visualization
+            const embeddingPoints = performDimensionalityReduction(validConcepts.map(c => c.vector));
+            
+            // Apply a simplified clustering algorithm
+            const clusters = performSimpleClustering(embeddingPoints);
+            
+            // Get colors for clusters and categories
+            const clusterColors = getColorScheme('viridis', Math.max(...clusters) + 1);
+            const categoryColors = {};
+            Object.keys(categories).forEach((cat, i) => {
+                categoryColors[cat] = getColorScheme('category10', Object.keys(categories).length)[i];
+            });
+            
+            // Create a trace for each cluster
+            const traces = [];
+            for (let clusterIndex = 0; clusterIndex <= Math.max(...clusters); clusterIndex++) {
+                const clusterPoints = [];
+                const clusterText = [];
+                const clusterCats = [];
+                
+                validConcepts.forEach((concept, i) => {
+                    if (clusters[i] === clusterIndex) {
+                        clusterPoints.push({
+                            x: embeddingPoints[i][0],
+                            y: embeddingPoints[i][1],
+                            category: concept.category,
+                            concept: concept.concept
+                        });
+                        clusterText.push(concept.concept);
+                        clusterCats.push(concept.category);
+                    }
+                });
+                
+                if (clusterPoints.length > 0) {
+                    traces.push({
+                        x: clusterPoints.map(p => p.x),
+                        y: clusterPoints.map(p => p.y),
+                        text: clusterText,
+                        mode: 'markers',
+                        type: 'scatter',
+                        name: `Cluster ${clusterIndex + 1}`,
+                        marker: {
+                            color: clusterColors[clusterIndex],
+                            size: 10,
+                            opacity: 0.7,
+                            line: {
+                                color: 'white',
+                                width: 1
+                            }
+                        },
+                        customdata: clusterCats,
+                        hovertemplate: 
+                            '<b>%{text}</b><br>' +
+                            'Category: %{customdata}<br>' +
+                            'Cluster: ' + (clusterIndex + 1) +
+                            '<extra></extra>'
+                    });
+                }
+            }
+            
+            // Layout configuration
+            const layout = {
+                title: {
+                    text: 'Concept Clusters',
+                    font: {
+                        size: 16
+                    }
+                },
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    yanchor: 'bottom',
+                    y: 1.02,
+                    xanchor: 'right',
+                    x: 1
+                },
+                hovermode: 'closest',
+                margin: { l: 40, r: 40, b: 40, t: 60 },
+                xaxis: {
+                    showticklabels: false,
+                    zeroline: false,
+                    title: 'Dimension 1'
+                },
+                yaxis: {
+                    showticklabels: false,
+                    zeroline: false,
+                    title: 'Dimension 2'
+                },
+                annotations: [
+                    {
+                        text: `${traces.length} clusters identified`,
+                        showarrow: false,
+                        x: 0,
+                        y: 1.05,
+                        xref: 'paper',
+                        yref: 'paper',
+                        xanchor: 'left',
+                        yanchor: 'bottom',
+                        font: {
+                            size: 12,
+                            color: '#7f7f7f'
+                        }
+                    }
+                ]
+            };
+            
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['lasso2d', 'toggleSpikelines'],
+                toImageButtonOptions: {
+                    format: 'png',
+                    filename: 'restaurant-concept-clusters',
+                    height: 800,
+                    width: 800,
+                    scale: 2
+                }
+            };
+            
+            // Plot the visualization
+            Plotly.newPlot(vizContainer, traces, layout, config);
+            
+            // Add export button
+            addExportButton(vizContainer, 'clustering-export-btn', 'Concept Clusters');
+            
+            // Add UI controls for cluster visualization
+            addClusteringControls(vizContainer);
+            
+            // Store the visualization type in the global data object
+            window.restaurantData.currentVisualization = 'clustering';
+            
+        } catch (error) {
+            vizContainer.innerHTML = `<div class="alert alert-danger">
+                <h6><i class="bi bi-exclamation-triangle me-2"></i>Error rendering clustering visualization</h6>
+                <p class="mb-0">${error.message}</p>
+                <button class="btn btn-sm btn-outline-danger mt-2" onclick="renderClusteringVisualization()">Try Again</button>
+            </div>`;
+            console.error('Error in renderClusteringVisualization:', error);
+        }
+    }, 300);
+}
+
+// Add controls for clustering visualization
+function addClusteringControls(container) {
+    const controlsDiv = document.createElement('div');
+    controlsDiv.className = 'clustering-controls position-absolute top-0 end-0 m-2';
+    controlsDiv.innerHTML = `
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-sm btn-outline-secondary" id="cluster-by-similarity">
+                <i class="bi bi-diagram-3 me-1"></i>By Similarity
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" id="cluster-by-category">
+                <i class="bi bi-tags me-1"></i>By Category
+            </button>
+        </div>
+    `;
+    
+    container.appendChild(controlsDiv);
+    
+    // Add event listeners
+    document.getElementById('cluster-by-similarity')?.addEventListener('click', function() {
+        this.classList.add('active');
+        document.getElementById('cluster-by-category')?.classList.remove('active');
+        // Re-render with similarity clustering
+        renderClusteringVisualization();
+    });
+    
+    document.getElementById('cluster-by-category')?.addEventListener('click', function() {
+        this.classList.add('active');
+        document.getElementById('cluster-by-similarity')?.classList.remove('active');
+        // Re-render with category clustering
+        renderClusteringByCategoryVisualization();
+    });
+}
+
+// Perform simplified clustering (k-means like approach)
+function performSimpleClustering(points) {
+    if (points.length <= 3) {
+        return points.map(() => 0); // All points in one cluster if very few
+    }
+    
+    // Determine number of clusters (rough heuristic)
+    const k = Math.min(Math.max(2, Math.floor(Math.sqrt(points.length / 2))), 8);
+    
+    // Initialize cluster centers by choosing points that are far apart
+    const centers = [points[0]];
+    for (let i = 1; i < k; i++) {
+        let farthestPoint = null;
+        let maxMinDistance = -Infinity;
+        
+        // Find point with maximum minimum distance to existing centers
+        for (let j = 0; j < points.length; j++) {
+            let minDistance = Infinity;
+            for (let c = 0; c < centers.length; c++) {
+                const dist = euclideanDistance(points[j], centers[c]);
+                minDistance = Math.min(minDistance, dist);
+            }
+            
+            if (minDistance > maxMinDistance) {
+                maxMinDistance = minDistance;
+                farthestPoint = points[j];
+            }
+        }
+        
+        centers.push(farthestPoint);
+    }
+    
+    // Assign points to nearest center
+    const assignments = [];
+    for (let i = 0; i < points.length; i++) {
+        let minDistance = Infinity;
+        let nearestCenter = 0;
+        
+        for (let j = 0; j < centers.length; j++) {
+            const dist = euclideanDistance(points[i], centers[j]);
+            if (dist < minDistance) {
+                minDistance = dist;
+                nearestCenter = j;
+            }
+        }
+        
+        assignments.push(nearestCenter);
+    }
+    
+    return assignments;
+}
+
+// Helper function to calculate Euclidean distance
+function euclideanDistance(p1, p2) {
+    return Math.sqrt(p1.reduce((sum, val, i) => sum + Math.pow(val - p2[i], 2), 0));
+}
+
+// Render clustering visualization by category
+function renderClusteringByCategoryVisualization() {
+    const vizContainer = document.getElementById('clusteringViz');
+    if (!vizContainer) return;
+    
+    if (!window.restaurantData.loaded) {
+        vizContainer.innerHTML = '<div class="alert alert-info">No restaurant data loaded. Please upload restaurant data files first.</div>';
+        return;
+    }
+    
+    // Show loading indicator
+    vizContainer.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border text-primary" role="status"></div><span class="ms-2">Loading category analysis...</span></div>';
+    
+    setTimeout(() => {
+        try {
+            const { vectors, labels, categories } = window.restaurantData;
+            
+            if (vectors.length === 0) {
+                vizContainer.innerHTML = '<div class="alert alert-warning">No vector data available for visualization.</div>';
+                return;
+            }
+            
+            // Perform dimensionality reduction
+            const embeddingPoints = performDimensionalityReduction(vectors);
+            
+            // Create a trace for each category
+            const categoryColors = getColorScheme('category10', Object.keys(categories).length);
+            const traces = [];
+            
+            Object.keys(categories).forEach((category, i) => {
+                const catPoints = [];
+                const catLabels = [];
+                
+                // Collect points for this category
+                labels.forEach((label, j) => {
+                    // Fix: Check if label is an object and access its properties correctly
+                    const labelCategory = typeof label === 'object' ? label.category : 
+                                         (typeof label === 'string' && label.includes(' -> ') ? 
+                                          label.split(' -> ')[0] : null);
+                    
+                    if (labelCategory === category) {
+                        const concept = typeof label === 'object' ? label.concept : 
+                                       (typeof label === 'string' && label.includes(' -> ') ? 
+                                        label.split(' -> ')[1] : label);
+                        
+                        catPoints.push({
+                            x: embeddingPoints[j][0],
+                            y: embeddingPoints[j][1]
+                        });
+                        catLabels.push(concept);
+                    }
+                });
+                
+                if (catPoints.length > 0) {
+                    traces.push({
+                        x: catPoints.map(p => p.x),
+                        y: catPoints.map(p => p.y),
+                        text: catLabels,
+                        mode: 'markers',
+                        type: 'scatter',
+                        name: category,
+                        marker: {
+                            color: categoryColors[i],
+                            size: 10,
+                            opacity: 0.7
+                        },
+                        hovertemplate: 
+                            '<b>%{text}</b><br>' +
+                            'Category: ' + category +
+                            '<extra></extra>'
+                    });
+                }
+            });
+            
+            // Layout configuration
+            const layout = {
+                title: {
+                    text: 'Concepts Grouped by Category',
+                    font: {
+                        size: 16
+                    }
+                },
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    yanchor: 'bottom',
+                    y: 1.02,
+                    xanchor: 'right',
+                    x: 1
+                },
+                hovermode: 'closest',
+                margin: { l: 40, r: 40, b: 40, t: 60 },
+                xaxis: {
+                    showticklabels: false,
+                    zeroline: false,
+                    title: 'Dimension 1'
+                },
+                yaxis: {
+                    showticklabels: false,
+                    zeroline: false,
+                    title: 'Dimension 2'
+                }
+            };
+            
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['lasso2d', 'toggleSpikelines'],
+                toImageButtonOptions: {
+                    format: 'png',
+                    filename: 'restaurant-concepts-by-category',
+                    height: 800,
+                    width: 800,
+                    scale: 2
+                }
+            };
+            
+            // Plot the visualization
+            Plotly.newPlot(vizContainer, traces, layout, config);
+            
+            // Add clustering controls if they don't exist
+            if (!document.querySelector('.clustering-controls')) {
+                addClusteringControls(vizContainer);
+            }
+            
+            // Make the category button active
+            document.getElementById('cluster-by-category')?.classList.add('active');
+            document.getElementById('cluster-by-similarity')?.classList.remove('active');
+            
+            // Add export button
+            addExportButton(vizContainer, 'category-cluster-export-btn', 'Concepts by Category');
+            
+        } catch (error) {
+            vizContainer.innerHTML = `<div class="alert alert-danger">
+                <h6><i class="bi bi-exclamation-triangle me-2"></i>Error rendering category visualization</h6>
+                <p class="mb-0">${error.message}</p>
+                <button class="btn btn-sm btn-outline-danger mt-2" onclick="renderClusteringByCategoryVisualization()">Try Again</button>
+            </div>`;
+            console.error('Error in renderClusteringByCategoryVisualization:', error);
+        }
+    }, 300);
+}
+
+// Implementation of distribution visualization with actual data
+function renderDistributionVisualization() {
+    const vizContainer = document.getElementById('distributionViz');
+    if (!vizContainer) return;
+    
+    if (!window.restaurantData.loaded) {
+        vizContainer.innerHTML = '<div class="alert alert-info">No restaurant data loaded. Please upload restaurant data files first.</div>';
+        return;
+    }
+    
+    // Show loading indicator
+    vizContainer.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border text-primary" role="status"></div><span class="ms-2">Loading distribution analysis...</span></div>';
+    
+    // Check for Plotly availability before proceeding
+    if (typeof Plotly === 'undefined') {
+        vizContainer.innerHTML = '<div class="alert alert-warning">Plotly.js is required for visualizations. Please check your internet connection and reload the page.</div>';
+        return;
+    }
+    
+    setTimeout(() => {
+        try {
+            // Extract category distribution data
+            const categories = window.restaurantData.categories;
+            if (!categories || Object.keys(categories).length === 0) {
+                vizContainer.innerHTML = '<div class="alert alert-warning">No category data available. The uploaded files may not contain properly formatted category information.</div>';
+                return;
+            }
+            
+            // Prepare data for visualization
+            const categoryNames = Object.keys(categories);
+            const conceptCounts = categoryNames.map(cat => 
+                Array.isArray(categories[cat]) ? categories[cat].length : 0);
+            
+            // Sort categories by concept count (descending)
+            const sortedIndices = conceptCounts
+                .map((count, idx) => ({ count, idx }))
+                .sort((a, b) => b.count - a.count)
+                .map(item => item.idx);
+            
+            const sortedCategories = sortedIndices.map(idx => categoryNames[idx]);
+            const sortedCounts = sortedIndices.map(idx => conceptCounts[idx]);
+            
+            // Calculate percentages for the pie chart
+            const total = sortedCounts.reduce((sum, count) => sum + count, 0);
+            const percentages = sortedCounts.map(count => (count / total * 100).toFixed(1) + '%');
+            
+            // Create bar chart trace
+            const barTrace = {
+                type: 'bar',
+                x: sortedCategories,
+                y: sortedCounts,
+                marker: {
+                    color: getColorScheme('category10', sortedCategories.length),
+                    line: {
+                        color: '#fff',
+                        width: 1
+                    }
+                },
+                hovertemplate: '<b>%{x}</b><br>Concepts: %{y}<br>Percentage: %{text}<extra></extra>',
+                text: percentages
+            };
+            
+            // Create pie chart trace
+            const pieTrace = {
+                type: 'pie',
+                labels: sortedCategories,
+                values: sortedCounts,
+                textinfo: 'percent',
+                hovertemplate: '<b>%{label}</b><br>Concepts: %{value}<br>Percentage: %{percent}<extra></extra>',
+                marker: {
+                    colors: getColorScheme('category10', sortedCategories.length),
+                    line: {
+                        color: '#fff',
+                        width: 1
+                    }
+                },
+                hole: 0.4,
+                pull: sortedIndices.map((_, idx) => idx === 0 ? 0.1 : 0) // Pull out the largest segment slightly
+            };
+            
+            // Create a 2x1 subplot layout
+            const layout = {
+                grid: {
+                    rows: 2,
+                    columns: 1,
+                    pattern: 'independent',
+                    roworder: 'top to bottom'
+                },
+                margin: {
+                    l: 50,
+                    r: 50,
+                    t: 50,
+                    b: 50
+                },
+                height: 500,
+                title: {
+                    text: 'Category Distribution Analysis',
+                    font: {
+                        size: 16
+                    }
+                },
+                annotations: [
+                    {
+                        text: 'Bar Chart: Category Concept Counts',
+                        showarrow: false,
+                        x: 0.5,
+                        y: 1.0,
+                        xref: 'paper',
+                        yref: 'paper',
+                        xanchor: 'center',
+                        yanchor: 'bottom'
+                    },
+                    {
+                        text: 'Pie Chart: Category Proportions',
+                        showarrow: false,
+                        x: 0.5,
+                        y: 0.45,
+                        xref: 'paper',
+                        yref: 'paper',
+                        xanchor: 'center',
+                        yanchor: 'bottom'
+                    }
+                ],
+                xaxis: {
+                    title: 'Categories',
+                    tickangle: -45,
+                },
+                yaxis: {
+                    title: 'Number of Concepts'
+                },
+                font: {
+                    family: "'Inter', -apple-system, sans-serif",
+                    size: 12
+                },
+                showlegend: false
+            };
+            
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+                toImageButtonOptions: {
+                    format: 'png',
+                    filename: 'restaurant-categories-distribution',
+                    height: 800,
+                    width: 800,
+                    scale: 2
+                }
+            };
+            
+            // Plot the bar chart in the top half
+            Plotly.newPlot(vizContainer, [barTrace], layout, config);
+            
+            // Add the pie chart to the bottom half of the subplot
+            Plotly.addTraces(vizContainer, pieTrace);
+            Plotly.update(vizContainer, {}, {
+                // Update layout to specify which subplot the pie chart should use
+                domain: {
+                    row: 1,
+                    column: 0
+                }
+            });
+            
+            // Add export button
+            addExportButton(vizContainer, 'distribution-export-btn', 'Restaurant Categories Distribution');
+            
+            // Store the visualization type
+            window.restaurantData.currentVisualization = 'distribution';
+            
+        } catch (error) {
+            vizContainer.innerHTML = `<div class="alert alert-danger">
+                <h6><i class="bi bi-exclamation-triangle me-2"></i>Error rendering distribution visualization</h6>
+                <p class="mb-0">${error.message}</p>
+                <button class="btn btn-sm btn-outline-danger mt-2" onclick="renderDistributionVisualization()">Try Again</button>
+            </div>`;
+            console.error('Error in renderDistributionVisualization:', error);
+        }
+    }, 300);
 }

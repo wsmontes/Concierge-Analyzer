@@ -529,6 +529,25 @@ if (typeof window.DebugInsightsModule === 'undefined') {
         const canvasElement = document.getElementById('restaurant-distribution-chart');
         if (!canvasElement) {
             console.warn("Canvas element 'restaurant-distribution-chart' not found");
+            
+            // Try to find a parent container where we could add a message
+            const possibleContainers = [
+                document.querySelector('.card-body'),
+                document.getElementById('debug-insight-cards'),
+                document.querySelector('.dashboard-card')
+            ];
+            
+            // Try to find an available container
+            for (const container of possibleContainers) {
+                if (container) {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-warning mt-2';
+                    alertDiv.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2"></i>Missing chart container: 'restaurant-distribution-chart'`;
+                    container.appendChild(alertDiv);
+                    break;
+                }
+            }
+            
             return;
         }
         
@@ -551,8 +570,25 @@ if (typeof window.DebugInsightsModule === 'undefined') {
             
             // Verify that restaurants data is available and in expected format
             const restaurants = restaurantInsight.data.restaurants;
-            if (!restaurants || !Array.isArray(restaurants)) {
+            if (!restaurants) {
+                console.warn("Restaurants data is missing");
+                
+                // Display a message in the chart area
+                const parent = canvasElement.parentElement;
+                if (parent) {
+                    parent.innerHTML = '<div class="alert alert-warning">No restaurant data available</div>';
+                }
+                return;
+            }
+            
+            if (!Array.isArray(restaurants)) {
                 console.warn("Restaurants data is not an array:", restaurants);
+                
+                // Display a message in the chart area
+                const parent = canvasElement.parentElement;
+                if (parent) {
+                    parent.innerHTML = '<div class="alert alert-warning">Invalid restaurant data format</div>';
+                }
                 return;
             }
             
@@ -566,14 +602,21 @@ if (typeof window.DebugInsightsModule === 'undefined') {
                 
                 // If data comes as array of [key, value] pairs
                 if (Array.isArray(restaurants[0])) {
-                    labels = restaurants.map(restaurant => restaurant[0]);
-                    values = restaurants.map(restaurant => restaurant[1]);
+                    labels = restaurants.map(restaurant => restaurant[0] || "Unknown");
+                    values = restaurants.map(restaurant => restaurant[1] || 0);
                 } 
                 // If data comes as array of objects with name and count properties
                 else if (typeof restaurants[0] === 'object') {
                     labels = restaurants.map(restaurant => restaurant.name || "Unknown");
                     values = restaurants.map(restaurant => restaurant.count || 0);
                 }
+            } else {
+                // No data case - show empty chart with a message
+                const parent = canvasElement.parentElement;
+                if (parent) {
+                    parent.innerHTML = '<div class="alert alert-info">No restaurant data to display</div>';
+                }
+                return;
             }
             
             // Create and store chart reference
@@ -617,7 +660,17 @@ if (typeof window.DebugInsightsModule === 'undefined') {
             console.log("Restaurant distribution chart created successfully");
         } catch (error) {
             console.error("Error creating restaurant distribution chart:", error);
-            throw error;
+            
+            // Display error message in the chart area
+            const parent = canvasElement.parentElement;
+            if (parent) {
+                parent.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        Error creating chart: ${error.message}
+                    </div>
+                `;
+            }
         }
     }
 

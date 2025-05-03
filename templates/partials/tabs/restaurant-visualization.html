@@ -82,11 +82,42 @@
                 
             <!-- Semantic Similarity Visualization -->
             <div class="tab-pane fade" id="similarity" role="tabpanel" aria-labelledby="similarity-tab">
-                <div class="alert alert-info">
-                    <h6><i class="bi bi-info-circle me-1"></i>Semantic Similarity</h6>
-                    <p class="mb-0">Visualize how different concepts relate to each other based on their embedding vectors. Similar concepts appear closer together in the visualization.</p>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">Similarity Options</h6>
+                                <div class="mb-3">
+                                    <label for="similarityColorScheme" class="form-label">Color Scheme</label>
+                                    <select class="form-select form-select-sm" id="similarityColorScheme">
+                                        <option value="category10">Category10</option>
+                                        <option value="viridis">Viridis</option>
+                                        <option value="plasma">Plasma</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="similarityPointSize" class="form-label">Point Size</label>
+                                    <input type="range" class="form-range" min="5" max="15" value="10" id="similarityPointSize">
+                                </div>
+                                <div class="d-grid">
+                                    <button class="btn btn-sm btn-primary" id="updateSimilarityViz">
+                                        <i class="bi bi-arrow-repeat me-1"></i>Update 
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h6 class="card-title">Description</h6>
+                                <p class="small">This visualization shows how different concepts relate to each other based on their embedding similarity. Similar concepts appear closer together in the 2D space.</p>
+                                <p class="small">Points are colored by category. The positions represent a 2D projection of the high-dimensional embedding space.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-9">
+                        <div class="visualization-container bg-white rounded p-2 shadow-sm" id="similarityViz" style="height: 500px;"></div>
+                    </div>
                 </div>
-                <div class="visualization-container bg-white rounded p-2 shadow-sm" id="similarityViz" style="height: 500px;"></div>
             </div>
                 
             <!-- Category Distribution Analysis -->
@@ -100,11 +131,52 @@
                 
             <!-- Concept Clustering -->
             <div class="tab-pane fade" id="clustering" role="tabpanel" aria-labelledby="clustering-tab">
-                <div class="alert alert-info">
-                    <h6><i class="bi bi-info-circle me-1"></i>Concept Clustering</h6>
-                    <p class="mb-0">See how concepts naturally cluster together based on their embedding similarity, regardless of their predefined categories.</p>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">Clustering Options</h6>
+                                <div class="mb-3">
+                                    <label for="clusteringMethod" class="form-label">Clustering Method</label>
+                                    <select class="form-select form-select-sm" id="clusteringMethod">
+                                        <option value="automatic">Automatic</option>
+                                        <option value="category">By Category</option>
+                                        <option value="similarity">By Similarity</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="clusteringColorScheme" class="form-label">Color Scheme</label>
+                                    <select class="form-select form-select-sm" id="clusteringColorScheme">
+                                        <option value="viridis">Viridis</option>
+                                        <option value="plasma">Plasma</option>
+                                        <option value="category10">Category10</option>
+                                    </select>
+                                </div>
+                                <div class="d-grid">
+                                    <button class="btn btn-sm btn-primary" id="updateClusteringViz">
+                                        <i class="bi bi-arrow-repeat me-1"></i>Update 
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h6 class="card-title">Description</h6>
+                                <p class="small">This visualization shows how concepts naturally cluster together based on their semantic similarity, regardless of their predefined categories.</p>
+                                <p class="small">Each color represents a different cluster. Concepts that appear closer together have more similar meanings.</p>
+                                <div class="mt-3">
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge bg-info me-2" id="clusterCount">0</span>
+                                        <span class="small text-muted">clusters identified</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-9">
+                        <div class="visualization-container bg-white rounded p-2 shadow-sm" id="clusteringViz" style="height: 500px;"></div>
+                    </div>
                 </div>
-                <div class="visualization-container bg-white rounded p-2 shadow-sm" id="clusteringViz" style="height: 500px;"></div>
             </div>
         </div>
     </div>
