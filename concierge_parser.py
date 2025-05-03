@@ -22,11 +22,7 @@ import io
 load_dotenv()
 
 # Use environment variables in the Flask app
-# FLASK_SERVER_URL = os.getenv('FLASK_SERVER_URL', 'http://localhost:5000')
-
-@app.route('/')
-def index():
-    return render_template('index.html')
+FLASK_SERVER_URL = os.getenv('FLASK_SERVER_URL', 'http://localhost:5000')
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, 
