@@ -3,7 +3,10 @@ import json
 import pandas as pd
 from datetime import datetime
 import ast
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template
+
+app = Flask(__name__, static_folder="static", template_folder="templates")
+
 import plotly.express as px
 import plotly.graph_objects as go
 import networkx as nx
@@ -19,12 +22,10 @@ import io
 load_dotenv()
 FLASK_SERVER_URL = os.getenv('FLASK_SERVER_URL', 'http://localhost:5000')
 
-# ─── AQUI COMEÇA SUA CONFIGURAÇÃO DO FLASK ───
-app = Flask(__name__)
-CORS(app)
-# ──────────────────────────────────────────────
-
-# agora você pode usar @app.route(…) normalmente
+@app.route('/')
+def index():
+    # em vez de: return "OK"
+    return render_template('index.html')
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, 
