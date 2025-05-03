@@ -34,9 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 exportPdfBtn.addEventListener('click', window.PdfExportModule.exportPDF);
             }
             
-            if (exportPdfSidebarBtn) {
-                exportPdfSidebarBtn.addEventListener('click', window.PdfExportModule.exportPDF);
-            }
+            // Removed event listener for sidebar export button
             
             if (exportPdfMobileBtn) {
                 exportPdfMobileBtn.addEventListener('click', window.PdfExportModule.exportPDF);
