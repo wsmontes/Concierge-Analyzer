@@ -4,25 +4,27 @@ import pandas as pd
 from datetime import datetime
 import ast
 from flask import Flask, render_template, request, jsonify
-from flask import render_template
 import plotly.express as px
 import plotly.graph_objects as go
 import networkx as nx
 from collections import defaultdict
 import logging
 import traceback
-from flask_cors import CORS  # Import CORS extension
-# Add a .env file to store environment variables
+from flask_cors import CORS
 from dotenv import load_dotenv
 import os
 import io
-# import openpyxl  # Add openpyxl for better Excel handlingel processing
 
-# Load environment variables from .env file
+# carrega variáveis de ambiente
 load_dotenv()
-
-# Use environment variables in the Flask app
 FLASK_SERVER_URL = os.getenv('FLASK_SERVER_URL', 'http://localhost:5000')
+
+# ─── AQUI COMEÇA SUA CONFIGURAÇÃO DO FLASK ───
+app = Flask(__name__)
+CORS(app)
+# ──────────────────────────────────────────────
+
+# agora você pode usar @app.route(…) normalmente
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, 
