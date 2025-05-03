@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime
 import ast
 from flask import Flask, render_template, request, jsonify
+from flask import render_template
 import plotly.express as px
 import plotly.graph_objects as go
 import networkx as nx
@@ -21,7 +22,11 @@ import io
 load_dotenv()
 
 # Use environment variables in the Flask app
-FLASK_SERVER_URL = os.getenv('FLASK_SERVER_URL', 'http://localhost:5000')
+# FLASK_SERVER_URL = os.getenv('FLASK_SERVER_URL', 'http://localhost:5000')
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, 
