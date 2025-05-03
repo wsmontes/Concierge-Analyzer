@@ -35,6 +35,11 @@ def index():
     logging.warning("→ Entrou no index() do concierge_parser")
     return render_template('index.html')
 
+@app.route('/ping')
+def ping():
+    return 'pong', 200
+
+
 # Set up logging
 logging.basicConfig(level=logging.INFO, 
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
