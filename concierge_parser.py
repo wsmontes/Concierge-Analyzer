@@ -12,6 +12,10 @@ import plotly.graph_objects as go
 import networkx as nx
 from collections import defaultdict
 import logging
+
+logging.basicConfig(level=logging.WARNING)
+app.logger.setLevel(logging.WARNING)
+
 import traceback
 from flask_cors import CORS
 
