@@ -28,6 +28,7 @@ FLASK_SERVER_URL = os.getenv('FLASK_SERVER_URL', 'http://localhost:5000')
 @app.route('/')
 def index():
     # em vez de: return "OK"
+    logging.warning("→ Entrou no index() do concierge_parser")
     return render_template('index.html')
 
 # Set up logging
