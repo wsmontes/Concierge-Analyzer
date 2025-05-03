@@ -3,9 +3,11 @@ import json
 import pandas as pd
 from datetime import datetime
 import ast
-from flask import Flask, render_template
+from flask import Flask, render_template, request, jsonify
 
-app = Flask(__name__, static_folder="static", template_folder="templates")
+# Create Flask app with correct static and template folder paths for PythonAnywhere
+app = Flask(__name__, static_folder="/home/wsmontes/Concierge-Analyzer/static", 
+            template_folder="/home/wsmontes/Concierge-Analyzer/templates")
 
 import plotly.express as px
 import plotly.graph_objects as go
@@ -13,32 +15,35 @@ import networkx as nx
 from collections import defaultdict
 import logging
 
+# Set up logging for PythonAnywhere
 logging.basicConfig(level=logging.WARNING)
 app.logger.setLevel(logging.WARNING)
 
 import traceback
 from flask_cors import CORS
 
+# Configure CORS for production
 CORS(app)
 
 from dotenv import load_dotenv
 import os
 import io
 
-# carrega variáveis de ambiente
+# Load environment variables
 load_dotenv()
-FLASK_SERVER_URL = os.getenv('FLASK_SERVER_URL', 'http://localhost:5000')
+# Default to PythonAnywhere URL
+FLASK_SERVER_URL = os.getenv('FLASK_SERVER_URL', 'https://wsmontes.pythonanywhere.com')
 
+# Root route needs to be updated to handle both direct access and dashboard
 @app.route('/')
 def index():
-    # em vez de: return "OK"
-    logging.warning("→ Entrou no index() do concierge_parser")
+    """Root route that renders the dashboard application."""
+    logging.warning("→ Accessed root route in PythonAnywhere environment")
     return render_template('index.html')
 
 @app.route('/ping')
 def ping():
     return 'pong', 200
-
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, 
@@ -796,6 +801,7 @@ def dashboard():
 def test():
     return jsonify({"status": "ok", "message": "Flask server is running"})
 
+# Update the upload_chat function to use PythonAnywhere paths
 @app.route('/upload', methods=['POST'])
 def upload_chat():
     logger.info("Received upload request")
@@ -819,8 +825,6 @@ def upload_chat():
             sheet_restaurants = parser.extract_sheet_restaurants(file)
             excel_file_processed = True
             # For Excel files, we need to convert the chat content to text
-            # This assumes the chat is in the first sheet or you need to 
-            # specify which sheet contains the chat content
             df = pd.read_excel(file)
             chat_text = df.to_csv(index=False)
         else:
@@ -830,8 +834,8 @@ def upload_chat():
         
         # Load persona data if not already loaded
         if not parser.persona_analyzer:
-            # Updated path to use the file in the project root
-            persona_csv_path = os.path.join(os.path.dirname(__file__), "Concierge - Personas.csv")
+            # Updated path for PythonAnywhere
+            persona_csv_path = os.path.join("/home/wsmontes/Concierge-Analyzer", "Concierge - Personas.csv")
             parser.load_personas(persona_csv_path)
         
         conversations = parser.parse_whatsapp_chat(chat_text)
@@ -927,12 +931,13 @@ def get_network():
         logger.error(f"Error generating network: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+# Updated path to load personas from PythonAnywhere path
 @app.route('/personas')
 def get_personas():
     try:
         if not parser.persona_analyzer:
-            # Updated path to use the file in the project root
-            persona_csv_path = os.path.join(os.path.dirname(__file__), "Concierge - Personas.csv")
+            # Updated path for PythonAnywhere
+            persona_csv_path = os.path.join("/home/wsmontes/Concierge-Analyzer", "Concierge - Personas.csv")
             parser.load_personas(persona_csv_path)
             
         return jsonify(parser.persona_analyzer.personas)
@@ -1022,8 +1027,5 @@ def get_sheet_restaurants():
         logger.error(f"Error getting sheet restaurants: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-if __name__ == "__main__":
-    # Make sure to run the Flask app on the correct host and port 
-    # and in debug mode for development
-    logger.info("Starting Flask server on http://localhost:5000")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+# This is important for PythonAnywhere WSGI to find the application
+application = app
