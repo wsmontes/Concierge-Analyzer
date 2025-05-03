@@ -766,6 +766,12 @@ debug_analyzer = DebugAnalyzer()
 
 @app.route('/')
 def index():
+    """Root route that returns a simple response to validate WSGI configuration."""
+    return 'OK'
+
+@app.route('/dashboard')
+def dashboard():
+    """Route that renders the full dashboard application."""
     return render_template('index.html')
 
 # Add a simple test route to verify the server is running
