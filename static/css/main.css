@@ -1085,3 +1085,17 @@ body {
         page-break-inside: avoid;
     }
 }
+
+/* Lotier Logo styling */
+.lotier-logo {
+    height: 80px; /* Increased from 40px */
+    max-width: 100%;
+    object-fit: contain;
+    margin-right: 0px; /* Added margin for spacing */
+}
+
+.sidebar .lotier-logo {
+    height: 90px; /* Increased from 30px */
+    margin-bottom: 0px;
+    max-width: 90%; /* Ensure it fits well in the sidebar */
+}
