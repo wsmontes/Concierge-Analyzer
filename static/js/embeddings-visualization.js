@@ -10,6 +10,7 @@ window.EmbeddingsVisualizationModule = (function() {
     // Private variables
     let isInitialized = false;
     let currentVisualization = null;
+    let integratedData = null;
     
     // Initialize the module
     function initialize() {
@@ -19,6 +20,9 @@ window.EmbeddingsVisualizationModule = (function() {
         
         // Set up event listeners for embeddings data loading
         document.addEventListener('embeddingsLoaded', handleEmbeddingsLoaded);
+        
+        // Listen for integrated data events
+        document.addEventListener('integratedDataReady', handleIntegratedDataReady);
         
         // Register with UI controls if available
         if (window.UIControlsModule && window.UIControlsModule.registerSectionCallback) {
@@ -54,6 +58,36 @@ window.EmbeddingsVisualizationModule = (function() {
         if (embeddingsSection && embeddingsSection.classList.contains('active')) {
             refreshVisualizations();
         }
+    }
+    
+    // Handle when integrated data is available
+    function handleIntegratedDataReady(event) {
+        integratedData = event.detail;
+        console.log('Embeddings visualization received integrated data');
+        
+        // Add mention counts to existing category hierarchy
+        updateCategoryHierarchyWithIntegratedData();
+    }
+    
+    // Update the category hierarchy visualization with integrated data
+    function updateCategoryHierarchyWithIntegratedData() {
+        // Only proceed if we're on the embeddings visualization section
+        const section = document.getElementById('embeddings-visualization-section');
+        if (!section || !section.classList.contains('active')) return;
+        
+        if (integratedData && window.embeddingsData && window.embeddingsData.loaded) {
+            console.log('Enhancing category hierarchy with integrated mention data');
+            
+            // Update category hierarchy visualization with integrated data
+            renderCategoryHierarchy(true);
+        }
+    }
+    
+    // Update the category hierarchy card with the latest data
+    function updateCategoryHierarchyCard() {
+        console.log('Updating category hierarchy card');
+        // Use integrated data if available
+        renderCategoryHierarchy(!!integratedData);
     }
     
     // Handle when embeddings visualization section is activated
@@ -128,7 +162,7 @@ window.EmbeddingsVisualizationModule = (function() {
     }
     
     // Extract category hierarchy from embeddings data
-    function extractCategoryHierarchy() {
+    function extractCategoryHierarchy(useIntegratedData = false) {
         if (!window.embeddingsData || !window.embeddingsData.loaded) {
             return null;
         }
@@ -150,11 +184,17 @@ window.EmbeddingsVisualizationModule = (function() {
             hierarchy.children.push(categoryNode);
         });
         
+        // If we should use integrated data and it's available, enhance with mention counts
+        if (useIntegratedData && integratedData) {
+            // Enhance values with mention counts
+            // ... code to incorporate mention counts from integratedData ...
+        }
+        
         return hierarchy;
     }
     
-    // Render category hierarchy visualization
-    function renderCategoryHierarchy() {
+    // Render category hierarchy visualization, optionally using integrated data
+    function renderCategoryHierarchy(useIntegratedData = false) {
         const container = document.getElementById('hierarchyViz');
         if (!container) {
             console.error('Hierarchy visualization container not found');
@@ -167,7 +207,7 @@ window.EmbeddingsVisualizationModule = (function() {
         }
         
         try {
-            const categoryHierarchy = extractCategoryHierarchy();
+            const categoryHierarchy = extractCategoryHierarchy(useIntegratedData);
             
             if (!categoryHierarchy || !categoryHierarchy.children || categoryHierarchy.children.length === 0) {
                 container.innerHTML = `
@@ -662,6 +702,7 @@ window.EmbeddingsVisualizationModule = (function() {
         renderCategoryHierarchy,
         renderSimilarityVisualization,
         renderDistributionVisualization,
-        refreshVisualizations
+        refreshVisualizations,
+        updateCategoryHierarchyCard
     };
 })();

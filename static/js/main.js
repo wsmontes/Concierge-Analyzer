@@ -211,10 +211,151 @@ document.addEventListener('DOMContentLoaded', function() {
         // If we have embeddings data loaded, integrate it with the conversation data
         if (window.embeddingsData && window.embeddingsData.loaded) {
             console.log('Integrating embeddings data with conversation analysis');
+            
+            // Integrate the embeddings data with conversations
+            integrateDataSources(data);
+            
             // Update embeddings visualizations if the module is available
             if (window.EmbeddingsVisualizationModule) {
                 window.EmbeddingsVisualizationModule.updateCategoryHierarchyCard();
             }
+        }
+        
+        // Check if we have restaurant data available
+        if (window.restaurantData && window.restaurantData.loaded) {
+            console.log('Restaurant data available, integrating with analysis');
+            integrateDataSources(data);
+        }
+    }
+    
+    /**
+     * Integrates multiple data sources: conversation data, embeddings, and restaurant data
+     * Creates cross-references and associations between these sources
+     * @param {Object} conversationData - The conversation analysis data
+     */
+    function integrateDataSources(conversationData) {
+        console.log('Starting data sources integration...');
+        
+        // Track what data sources we have available
+        const hasEmbeddings = window.embeddingsData && window.embeddingsData.loaded;
+        const hasRestaurants = window.restaurantData && window.restaurantData.loaded;
+        const hasConversations = conversationData && conversationData.metrics && conversationData.metrics.length > 0;
+        
+        if (!hasConversations) {
+            console.warn('No conversation data available for integration');
+            return;
+        }
+
+        // Create integrated data structure
+        if (!window.integratedData) {
+            window.integratedData = {
+                concepts: {},
+                restaurants: {},
+                conversations: {},
+                relationships: [],
+                categoryCounts: {}
+            };
+        }
+        
+        // Step 1: Process conversation data
+        conversationData.metrics.forEach(conversation => {
+            window.integratedData.conversations[conversation.id] = conversation;
+        });
+        
+        // Step 2: Process embeddings data if available
+        if (hasEmbeddings) {
+            console.log('Processing embeddings for integration...');
+            
+            // Process categories and concepts from embeddings
+            if (window.embeddingsData.categories) {
+                Object.keys(window.embeddingsData.categories).forEach(category => {
+                    if (!window.integratedData.categoryCounts[category]) {
+                        window.integratedData.categoryCounts[category] = 0;
+                    }
+                    
+                    window.embeddingsData.categories[category].forEach(concept => {
+                        const conceptKey = `${category} -> ${concept}`;
+                        window.integratedData.concepts[conceptKey] = {
+                            category: category,
+                            concept: concept,
+                            fullLabel: conceptKey,
+                            mentionCount: 0,
+                            restaurants: []
+                        };
+                    });
+                });
+            }
+            
+            // Process mentions in conversations
+            conversationData.metrics.forEach(conversation => {
+                // Check if conversation has concept mentions
+                if (conversation.concepts_mentioned && conversation.concepts_mentioned.length > 0) {
+                    conversation.concepts_mentioned.forEach(mention => {
+                        if (window.integratedData.concepts[mention]) {
+                            window.integratedData.concepts[mention].mentionCount++;
+                            window.integratedData.categoryCounts[window.integratedData.concepts[mention].category]++;
+                        }
+                    });
+                }
+            });
+            
+            console.log(`Integrated ${Object.keys(window.integratedData.concepts).length} concepts from embeddings data`);
+        }
+        
+        // Step 3: Process restaurant data if available
+        if (hasRestaurants) {
+            console.log('Processing restaurant data for integration...');
+            
+            // Map restaurants to concepts
+            if (window.restaurantData.restaurants) {
+                Object.keys(window.restaurantData.restaurants).forEach(restaurantName => {
+                    const restaurant = window.restaurantData.restaurants[restaurantName];
+                    window.integratedData.restaurants[restaurantName] = restaurant;
+                    
+                    // Link restaurant to concepts
+                    if (restaurant.concepts) {
+                        restaurant.concepts.forEach(conceptKey => {
+                            if (window.integratedData.concepts[conceptKey]) {
+                                window.integratedData.concepts[conceptKey].restaurants.push(restaurantName);
+                            }
+                        });
+                    }
+                });
+            }
+            
+            console.log(`Integrated ${Object.keys(window.integratedData.restaurants).length} restaurants with concept data`);
+        }
+        
+        // Step 4: Build relationships between conversations, concepts, and restaurants
+        console.log('Building cross-reference relationships...');
+        window.integratedData.relationships = [];
+        
+        Object.values(window.integratedData.conversations).forEach(conversation => {
+            if (conversation.concepts_mentioned && conversation.concepts_mentioned.length > 0) {
+                conversation.concepts_mentioned.forEach(concept => {
+                    if (window.integratedData.concepts[concept]) {
+                        // For each restaurant that matches this concept
+                        window.integratedData.concepts[concept].restaurants.forEach(restaurant => {
+                            window.integratedData.relationships.push({
+                                conversationId: conversation.id,
+                                concept: concept,
+                                restaurant: restaurant
+                            });
+                        });
+                    }
+                });
+            }
+        });
+        
+        // Notify modules that integrated data is available
+        console.log(`Integration complete: ${window.integratedData.relationships.length} relationships established`);
+        document.dispatchEvent(new CustomEvent('integratedDataReady', {
+            detail: window.integratedData
+        }));
+        
+        // Update Debug Insights with integrated data if module is available
+        if (window.DebugInsightsModule && typeof window.DebugInsightsModule.updateWithIntegratedData === 'function') {
+            window.DebugInsightsModule.updateWithIntegratedData(window.integratedData);
         }
     }
     
@@ -332,6 +473,9 @@ document.addEventListener('DOMContentLoaded', function() {
             toastEl.remove();
         });
     }
+
+    // Expose the notification function to the global scope
+    window.showNotification = showNotification;
     
     // Initialize the application
     initEventListeners();
@@ -476,3 +620,58 @@ document.addEventListener('DOMContentLoaded', function() {
         Chart.defaults.font.family = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
     }
 });
+
+/**
+ * Process the upload response data and trigger any necessary events
+ * @param {Object} data - The response data from the server
+ */
+function processUploadResponse(data) {
+    // ...existing code...
+
+    // Check if an Excel file was processed and sheet restaurant data was extracted
+    if (data.excel_file_processed) {
+        console.log('Excel file was processed, triggering excelFileProcessed event');
+        
+        // Dispatch the excelFileProcessed event to notify components like restaurant-visualizer
+        window.dispatchEvent(new CustomEvent('excelFileProcessed', { 
+            detail: { 
+                sheetRestaurants: data.sheet_restaurants || []
+            } 
+        }));
+    }
+
+    // ...existing code...
+    return data;
+}
+
+/**
+ * Upload a file to the server
+ * @param {File} file - The file to upload
+ * @returns {Promise} - A promise that resolves with the server response
+ */
+function uploadFile(file) {
+    // ...existing code...
+    
+    return fetch('/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Upload response:', data);
+        
+        // Process the response using our new function
+        return processUploadResponse(data);
+    })
+    .catch(error => {
+        // ...existing error handling code...
+    });
+}
+
+// ...existing code...

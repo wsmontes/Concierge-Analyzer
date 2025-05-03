@@ -14,6 +14,8 @@ from flask_cors import CORS  # Import CORS extension
 # Add a .env file to store environment variables
 from dotenv import load_dotenv
 import os
+import io
+# import openpyxl  # Add openpyxl for better Excel handlingel processing
 
 # Load environment variables from .env file
 load_dotenv()
@@ -248,6 +250,7 @@ class ConciergeParser:
         self.current_conversation = []
         self.debug_data = []
         self.persona_analyzer = None
+        self.sheet_restaurants = []  # New property to store restaurant names from sheets
         
     def load_personas(self, csv_path):
         """Load personas from CSV file"""
@@ -393,6 +396,18 @@ class ConciergeParser:
                 # Evaluate recommendation accuracy
                 evaluation = self.persona_analyzer.evaluate_recommendations(conversation, persona_id)
                 
+                # If we have sheet restaurants, try to match expected recommendations to sheet names
+                if self.sheet_restaurants and 'expected_recommendations' in evaluation:
+                    matched_expected = []
+                    for rec in evaluation['expected_recommendations']:
+                        sheet_match = self.match_restaurant_to_sheet(rec)
+                        matched_expected.append({
+                            'original': rec,
+                            'sheet_match': sheet_match,
+                            'name': sheet_match if sheet_match else rec
+                        })
+                    evaluation['matched_expected'] = matched_expected
+                
                 # Find matching persona info
                 persona_info = next((p for p in self.persona_analyzer.personas if p['id'] == persona_id), None)
                 
@@ -494,6 +509,24 @@ class ConciergeParser:
         
         return metrics
     
+    def match_restaurant_to_sheet(self, restaurant_name):
+        """Match a restaurant name to a sheet restaurant name using similarity matching"""
+        if not self.sheet_restaurants or not restaurant_name:
+            return None
+            
+        # First try exact match (case insensitive)
+        for sheet_name in self.sheet_restaurants:
+            if restaurant_name.lower().strip() == sheet_name.lower().strip():
+                return sheet_name
+                
+        # If no exact match, try restaurant name similarity algorithm
+        if self.persona_analyzer:
+            for sheet_name in self.sheet_restaurants:
+                if self.persona_analyzer._is_same_restaurant(restaurant_name, sheet_name):
+                    return sheet_name
+                    
+        return None
+    
     def extract_restaurant_recommendations(self):
         """Extract restaurant recommendations from all conversations"""
         recommendations = []
@@ -512,6 +545,16 @@ class ConciergeParser:
                 restaurant_pattern = r'[-–]\s*(.*?)(?=\s*[-–]|\n|$)'
                 potential_restaurants = re.findall(r'- ([^:]+?)(?=\s*–|\s*-|\s*\n|$)', content)
                 
+                # Match potential restaurants with sheet restaurants
+                matched_restaurants = []
+                for restaurant in potential_restaurants:
+                    sheet_match = self.match_restaurant_to_sheet(restaurant)
+                    matched_restaurants.append({
+                        'extracted': restaurant,
+                        'sheet_match': sheet_match,
+                        'name': sheet_match if sheet_match else restaurant  # Use sheet name if matched
+                    })
+                
                 # Add candidate restaurants from debug data if available
                 candidate_restaurants = []
                 for msg in conversation:
@@ -523,7 +566,14 @@ class ConciergeParser:
                                         if ' -> ' in value:
                                             parts = value.split(' -> ')
                                             if len(parts) > 1:
-                                                candidate_restaurants.append((key, parts[1]))
+                                                candidate_name = parts[1]
+                                                sheet_match = self.match_restaurant_to_sheet(candidate_name)
+                                                candidate_restaurants.append({
+                                                    'category': key,
+                                                    'extracted': candidate_name,
+                                                    'sheet_match': sheet_match,
+                                                    'name': sheet_match if sheet_match else candidate_name
+                                                })
                 
                 # Get persona information if available
                 persona_id = next((msg.get('persona_id') for msg in conversation if 'persona_id' in msg), None)
@@ -534,11 +584,24 @@ class ConciergeParser:
                 expected_recommendations = evaluation.get('expected_recommendations', [])
                 accuracy = evaluation.get('accuracy', None)
                 
+                # If we have sheet restaurants and expected recommendations, match those too
+                matched_expected = []
+                if expected_recommendations and self.sheet_restaurants:
+                    for rec in expected_recommendations:
+                        sheet_match = self.match_restaurant_to_sheet(rec)
+                        matched_expected.append({
+                            'extracted': rec,
+                            'sheet_match': sheet_match,
+                            'name': sheet_match if sheet_match else rec
+                        })
+                
                 recommendation_item = {
                     'conversation_id': i,
                     'request': user_request,
-                    'potential_restaurants': potential_restaurants,
+                    'potential_restaurants': potential_restaurants,  # Keep original for backward compatibility
+                    'matched_restaurants': matched_restaurants,     # New field with matching information
                     'candidate_restaurants': candidate_restaurants,
+                    'sheet_restaurants': self.sheet_restaurants,
                     'full_recommendation': content
                 }
                 
@@ -549,12 +612,58 @@ class ConciergeParser:
                     
                 # Add recommendation evaluation if available
                 if evaluation:
-                    recommendation_item['expected_restaurants'] = expected_recommendations
+                    recommendation_item['expected_restaurants'] = expected_recommendations  # Keep original
+                    recommendation_item['matched_expected'] = matched_expected              # Add matched version
                     recommendation_item['accuracy'] = accuracy
                 
                 recommendations.append(recommendation_item)
         
         return recommendations
+
+    def extract_sheet_restaurants(self, file):
+        """Extract restaurant names from sheet names in Excel files"""
+        self.sheet_restaurants = []
+        try:
+            if file.filename.endswith(('.xlsx', '.xls')):
+                # Save the file to a temporary in-memory file
+                file_data = file.read()
+                file.seek(0)  # Reset file pointer for future reads
+                
+                # Use pandas for both xlsx and xls files
+                xls = pd.ExcelFile(io.BytesIO(file_data))
+                all_sheet_names = xls.sheet_names
+                
+                # Known list of non-restaurant sheet names to filter out
+                non_restaurant_sheets = {
+                    'sheet1', 'sheet2', 'sheet3', 'sheet4', 'sheet5',
+                    'index', 'data', 'info', 'summary', 'contents', 'cover'
+                }
+                
+                # Filter out known non-restaurant sheets (case insensitive)
+                self.sheet_restaurants = [
+                    name for name in all_sheet_names 
+                    if name.lower().strip() not in non_restaurant_sheets
+                ]
+                
+                # Additional validation for known Excel structure
+                # Sheet names with just numbers or special patterns are likely not restaurants
+                self.sheet_restaurants = [
+                    name for name in self.sheet_restaurants
+                    if not name.strip().isdigit() and  # Exclude purely numeric names
+                    not name.strip().startswith('_') and  # Exclude names starting with underscore
+                    len(name.strip()) > 1  # Ensure name has more than 1 character
+                ]
+                
+                # Sort alphabetically for consistent display
+                self.sheet_restaurants.sort()
+                
+                logger.info(f"Extracted {len(self.sheet_restaurants)} restaurant names from sheets: {self.sheet_restaurants}")
+                return self.sheet_restaurants
+            return []
+        except Exception as e:
+            logger.error(f"Error extracting sheet restaurants with pandas: {str(e)}")
+            logger.error(traceback.format_exc())
+            return []
 
     def generate_metadata_network(self):
         """Generate network graph data from metadata relationships"""
@@ -668,11 +777,11 @@ def test():
 def upload_chat():
     logger.info("Received upload request")
     
-    if 'file' not in request.files:  # Changed from 'chat_file' to 'file'
+    if 'file' not in request.files:
         logger.warning("No file uploaded in request")
         return jsonify({'error': 'No file uploaded'}), 400
     
-    file = request.files['file']  # Changed from 'chat_file' to 'file'
+    file = request.files['file']
     
     if file.filename == '':
         logger.warning("Empty filename in uploaded file")
@@ -680,7 +789,20 @@ def upload_chat():
     
     try:
         logger.info(f"Processing uploaded file: {file.filename}")
-        chat_text = file.read().decode('utf-8')
+        
+        # Check file type and extract sheet names if it's an Excel file
+        excel_file_processed = False
+        if file.filename.endswith(('.xlsx', '.xls')):
+            sheet_restaurants = parser.extract_sheet_restaurants(file)
+            excel_file_processed = True
+            # For Excel files, we need to convert the chat content to text
+            # This assumes the chat is in the first sheet or you need to 
+            # specify which sheet contains the chat content
+            df = pd.read_excel(file)
+            chat_text = df.to_csv(index=False)
+        else:
+            chat_text = file.read().decode('utf-8')
+            
         logger.info(f"File decoded successfully, length: {len(chat_text)}")
         
         # Load persona data if not already loaded
@@ -723,7 +845,9 @@ def upload_chat():
             'recommendations': recommendations,
             'network': network_data,
             'persona_summary': persona_summary,
-            'conversation_summaries': conversation_summaries  # Include summaries in the response
+            'conversation_summaries': conversation_summaries,  # Include summaries in the response
+            'sheet_restaurants': parser.sheet_restaurants,  # Add sheet restaurants to the response
+            'excel_file_processed': excel_file_processed  # Add flag to indicate Excel file was processed
         }
         
         # Verify the response can be serialized to JSON
@@ -842,6 +966,37 @@ def get_conversation_debug_analysis(conversation_id):
     except Exception as e:
         logger.error(f"Error generating conversation debug analysis: {str(e)}")
         logger.error(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+# Add a new endpoint to get sheet restaurants
+@app.route('/sheet_restaurants')
+def get_sheet_restaurants():
+    try:
+        # If we don't have sheet restaurants yet but we have a persona_analyzer
+        # that might have restaurant data, try to extract known restaurant names
+        if not parser.sheet_restaurants and parser.persona_analyzer:
+            # Look for restaurant names in existing data
+            known_restaurants = set()
+            
+            # Try to find restaurant names in recommendation evaluations
+            for conversation in parser.conversations:
+                for msg in conversation:
+                    if msg.get('type') == 'recommendation' and 'recommendation_evaluation' in msg:
+                        eval_data = msg.get('recommendation_evaluation', {})
+                        if 'expected_recommendations' in eval_data:
+                            for restaurant in eval_data['expected_recommendations']:
+                                if restaurant and len(restaurant) > 2:  # Basic validation
+                                    known_restaurants.add(restaurant)
+            
+            # If we found any restaurants, add them to sheet_restaurants
+            if known_restaurants:
+                parser.sheet_restaurants = list(known_restaurants)
+                parser.sheet_restaurants.sort()
+                logger.info(f"Added {len(parser.sheet_restaurants)} known restaurants from evaluation data")
+        
+        return jsonify(parser.sheet_restaurants)
+    except Exception as e:
+        logger.error(f"Error getting sheet restaurants: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":

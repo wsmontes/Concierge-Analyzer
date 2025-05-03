@@ -10,6 +10,7 @@ let recommendationsData = [];
 let selectedConversation = null;
 let isRendering = false;
 let isConversationsSectionActive = false;
+let integratedData = null;
 
 // Create a namespace to expose functions to other modules
 window.ConversationModule = {
@@ -22,12 +23,22 @@ window.ConversationModule = {
 
 // Initialize conversations list
 function initializeConversationsList(metrics, recommendations) {
-    console.log("Initializing conversations list with:", metrics ? metrics.length : 0, "metrics", 
-                recommendations ? recommendations.length : 0, "recommendations");
+    console.log("Initializing conversations list with:", metrics.length, "metrics", recommendations.length, "recommendations");
     
-    // Store data for deferred rendering
-    conversationMetrics = metrics || [];
-    recommendationsData = recommendations || [];
+    // Store the data for later use
+    conversationMetrics = metrics;
+    recommendationsData = recommendations;
+    
+    // Listen for integrated data events
+    document.addEventListener('integratedDataReady', function(event) {
+        integratedData = event.detail;
+        console.log('Conversations module received integrated data');
+        
+        // If the conversation detail is currently shown, update it with relationship data
+        if (selectedConversation) {
+            updateCurrentConversationWithIntegratedData();
+        }
+    });
     
     // Check if conversations section exists before proceeding
     const conversationsSection = document.getElementById('conversations-section');
@@ -417,6 +428,67 @@ function displayConversationDetails(conversation, conversationId) {
         if (messagesContainer) {
             messagesContainer.classList.add('hide-debug');
         }
+    }
+    
+    // Update current conversation view with integrated data
+    updateCurrentConversationWithIntegratedData();
+}
+
+// Update current conversation view with integrated data
+function updateCurrentConversationWithIntegratedData() {
+    if (!selectedConversation || !integratedData) return;
+    
+    // Find relationships for this conversation
+    const conversationId = selectedConversation.id;
+    const relationships = integratedData.relationships.filter(rel => 
+        rel.conversationId === conversationId);
+    
+    if (relationships.length > 0) {
+        console.log(`Found ${relationships.length} relationships for conversation ${conversationId}`);
+        
+        // Get or create relationship container
+        let relationshipContainer = document.getElementById('conversation-relationships');
+        if (!relationshipContainer) {
+            relationshipContainer = document.createElement('div');
+            relationshipContainer.id = 'conversation-relationships';
+            relationshipContainer.className = 'concept-relationships mt-4';
+            
+            // Find where to insert it
+            const detailsContainer = document.querySelector('.conversation-details');
+            if (detailsContainer) {
+                detailsContainer.appendChild(relationshipContainer);
+            }
+        }
+        
+        // Group relationships by concept
+        const conceptRelationships = {};
+        relationships.forEach(rel => {
+            if (!conceptRelationships[rel.concept]) {
+                conceptRelationships[rel.concept] = [];
+            }
+            conceptRelationships[rel.concept].push(rel.restaurant);
+        });
+        
+        // Build UI for relationships
+        let html = `
+            <h5 class="mb-3"><i class="bi bi-diagram-3 me-2"></i>Concept-Restaurant Relationships</h5>
+            <div class="relationship-items">
+        `;
+        
+        Object.entries(conceptRelationships).forEach(([concept, restaurants]) => {
+            html += `
+                <div class="relationship-item mb-3 p-3 border rounded">
+                    <div class="concept-name fw-bold">${concept}</div>
+                    <div class="restaurant-list mt-2">
+                        <span class="text-muted me-2">Restaurants:</span>
+                        ${restaurants.map(r => `<span class="badge bg-secondary me-1">${r}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        relationshipContainer.innerHTML = html;
     }
 }
 

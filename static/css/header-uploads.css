@@ -1,18 +1,12 @@
 /**
  * Header Upload Components Styling
- * Provides styling for upload forms relocated to the top navigation bar
+ * Provides styling for upload forms (now relocated to the sidebar)
  * Dependencies: main.css for base upload styling
  */
 
-/* Header Upload Forms Container */
+/* The upload elements have been moved to the sidebar */
 .header-uploads-container {
-    display: flex;
-    flex-grow: 1;
-    justify-content: center;
-    align-items: center;
-    gap: 15px;
-    margin: 0 15px;
-    height: 40px;
+    display: none;
 }
 
 /* Individual Header Upload Item */

@@ -1,0 +1,166 @@
+<!-- 
+  Restaurant Detail component for Concierge Chat Analyzer
+  Provides detailed view and analysis of individual restaurant data
+  Dependencies: restaurant-detail.js, Chart.js, bootstrap
+-->
+<div class="dashboard-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h3><i class="bi bi-cup-hot me-2"></i>Restaurant Detail View</h3>
+        <div>
+            <button class="btn btn-sm btn-outline-secondary" id="refreshRestaurantDetail">
+                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <!-- Restaurant Selection Header -->
+        <div class="p-3 bg-light border-bottom">
+            <div class="row align-items-center">
+                <div class="col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="restaurant-search" placeholder="Search restaurants...">
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <select class="form-select" id="restaurant-selector">
+                        <option value="">Select a restaurant...</option>
+                        <!-- Options will be populated via JS -->
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <div class="d-flex justify-content-end">
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" id="restaurant-prev" title="Previous restaurant">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+                            <button class="btn btn-outline-primary" id="restaurant-next" title="Next restaurant">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Restaurant Detail Content -->
+        <div class="container-fluid mt-3 p-3 restaurant-detail-container">
+            <div class="row g-3" id="restaurant-detail-content">
+                <!-- Empty State -->
+                <div class="col-12 py-5 text-center" id="restaurant-empty-state">
+                    <div class="py-5">
+                        <i class="bi bi-cup-hot display-1 text-muted mb-3"></i>
+                        <h4>Select a Restaurant to View Details</h4>
+                        <p class="text-muted">Choose a restaurant from the dropdown above or upload restaurant data</p>
+                        <button class="btn btn-primary mt-3" id="restaurant-detail-upload">
+                            <i class="bi bi-upload me-2"></i>Upload Restaurant Data
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Restaurant Detail View (initially hidden) -->
+                <div class="col-12 d-none" id="restaurant-detail-view">
+                    <!-- Restaurant Header -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h2 id="restaurant-name">Restaurant Name</h2>
+                                    <div class="text-muted" id="restaurant-id-display">ID: --</div>
+                                </div>
+                                <div>
+                                    <span class="badge rounded-pill bg-primary px-3 py-2" id="restaurant-category-count">0 Categories</span>
+                                    <span class="badge rounded-pill bg-success px-3 py-2" id="restaurant-concept-count">0 Concepts</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Restaurant Categories and Concepts -->
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <div class="card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="bi bi-tags me-2"></i>Categories</h5>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-sm btn-outline-primary" id="restaurant-expand-all">
+                                            <i class="bi bi-arrows-angle-expand me-1"></i>Expand All
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-primary" id="restaurant-collapse-all">
+                                            <i class="bi bi-arrows-angle-contract me-1"></i>Collapse All
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="list-group list-group-flush" id="restaurant-categories-list">
+                                        <!-- Categories will be populated via JS -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-7">
+                            <div class="card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0"><i class="bi bi-grid-3x3 me-2"></i>Concepts</h5>
+                                    <div class="input-group input-group-sm" style="width: 250px;">
+                                        <span class="input-group-text"><i class="bi bi-filter"></i></span>
+                                        <input type="text" class="form-control" id="concept-filter" placeholder="Filter concepts...">
+                                        <button class="btn btn-outline-secondary" id="clear-concept-filter">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Concept</th>
+                                                    <th>Category</th>
+                                                    <th>Confidence</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="restaurant-concepts-table">
+                                                <!-- Concepts will be populated via JS -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Restaurant Visualizations -->
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Category Distribution</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container" style="position: relative; height: 300px;">
+                                        <canvas id="restaurant-category-chart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Concept Strength</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container" style="position: relative; height: 300px;">
+                                        <canvas id="restaurant-concept-strength-chart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

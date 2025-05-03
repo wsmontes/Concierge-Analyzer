@@ -11,17 +11,188 @@ window.restaurantData = {
     labels: [],
     categories: {},
     loaded: false,
-    currentVisualization: null
+    currentVisualization: null,
+    sheetRestaurants: [] // Added sheetRestaurants property
 };
 
 // Wait for the document to be fully loaded before initializing
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Initializing Restaurant Visualizer module');
     
-    // Use a longer delay to ensure all elements are properly rendered
-    // This helps prevent "element not found" errors in complex layouts
+    // Initialize UI components without waiting for sheet restaurants
     setTimeout(safeInit, 800);
+    
+    // Listen for Excel file upload events
+    window.addEventListener('excelFileProcessed', function(event) {
+        console.log('Excel file processed, fetching sheet restaurants');
+        fetchSheetRestaurants().then(() => {
+            console.log('Sheet restaurants updated from Excel file');
+            
+            // Notify any pending processes that sheet restaurants are now available
+            window.dispatchEvent(new CustomEvent('sheetRestaurantsReady'));
+        });
+    });
 });
+
+// Fetch sheet restaurant data from API with enhanced handling for consistent Excel files
+function fetchSheetRestaurants() {
+    return fetch('/sheet_restaurants')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to fetch sheet restaurant data');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(`Loaded ${data.length} restaurant names from sheets`);
+            window.restaurantData.sheetRestaurants = data;
+            
+            // If sheet names are available, use them to enhance existing data
+            if (data.length > 0 && window.restaurantData.restaurants) {
+                enhanceRestaurantsWithSheetNames(window.restaurantData.restaurants, data);
+            }
+            
+            // Make the sheet restaurants available globally
+            window.sheetRestaurants = data;
+            
+            // Dispatch event to notify other components
+            if (data.length > 0) {
+                window.dispatchEvent(new CustomEvent('sheetRestaurantsLoaded', { 
+                    detail: { restaurants: data } 
+                }));
+            }
+            return data;
+        })
+        .catch(error => {
+            // More graceful error handling - log but don't alert
+            console.error('Error fetching sheet restaurant data:', error);
+            window.restaurantData.sheetRestaurants = [];
+            return [];
+        });
+}
+
+// Add a public method to refresh sheet restaurants after Excel file upload
+window.refreshSheetRestaurants = function() {
+    console.log('Manual refresh of sheet restaurants requested');
+    return fetchSheetRestaurants();
+};
+
+// Enhance existing restaurant data with sheet names
+function enhanceRestaurantsWithSheetNames(restaurants, sheetNames) {
+    if (!restaurants || !Array.isArray(restaurants) || !sheetNames.length) return;
+    
+    restaurants.forEach(restaurant => {
+        // Find matching sheet name
+        const matchedName = findMatchingSheetRestaurant(restaurant.name, sheetNames);
+        if (matchedName && matchedName !== restaurant.name) {
+            restaurant.sheetName = matchedName;
+            restaurant.displayName = matchedName; // Use sheet name for display
+            restaurant.isSheetName = true;
+        }
+    });
+    
+    console.log('Enhanced restaurant data with sheet restaurant names');
+}
+
+// Find matching sheet restaurant name for consistent Excel files
+function findMatchingSheetRestaurant(restaurantName, sheetNames) {
+    if (!restaurantName || !sheetNames || !sheetNames.length) {
+        return null;
+    }
+    
+    // Normalize names to improve matching for consistent sheet structures
+    const normalizedRestaurantName = normalizeRestaurantName(restaurantName);
+    
+    // Try exact match first (case-insensitive) with normalized names
+    for (const sheetName of sheetNames) {
+        if (normalizeRestaurantName(sheetName).toLowerCase() === normalizedRestaurantName.toLowerCase()) {
+            return sheetName;
+        }
+    }
+    
+    // Try partial match with higher threshold for consistent data
+    for (const sheetName of sheetNames) {
+        if (sheetName.toLowerCase().includes(normalizedRestaurantName.toLowerCase()) ||
+            normalizedRestaurantName.toLowerCase().includes(normalizeRestaurantName(sheetName).toLowerCase())) {
+            // Check if one is significantly longer than the other
+            const lengthRatio = Math.min(sheetName.length, restaurantName.length) / 
+                               Math.max(sheetName.length, restaurantName.length);
+            if (lengthRatio > 0.6) { // Increased threshold for consistent Excel files
+                return sheetName;
+            }
+        }
+    }
+    
+    // Try word similarity match with higher threshold
+    const similarityThreshold = 0.75; // 75% word similarity required
+    for (const sheetName of sheetNames) {
+        if (calculateWordSimilarity(restaurantName, sheetName) >= similarityThreshold) {
+            return sheetName;
+        }
+    }
+    
+    return null;
+}
+
+// Calculate word similarity between restaurant names
+function calculateWordSimilarity(name1, name2) {
+    // Normalize names first
+    const n1 = normalizeRestaurantName(name1);
+    const n2 = normalizeRestaurantName(name2);
+    
+    // Split into words
+    const words1 = new Set(n1.split(/\s+/).filter(w => w.length > 1));
+    const words2 = new Set(n2.split(/\s+/).filter(w => w.length > 1));
+    
+    if (words1.size === 0 || words2.size === 0) {
+        return 0.0;
+    }
+    
+    // Count shared words
+    let sharedWords = 0;
+    for (const word of words1) {
+        if (words2.has(word)) {
+            sharedWords++;
+        }
+    }
+    
+    // Calculate Jaccard similarity
+    return sharedWords / (words1.size + words2.size - sharedWords);
+}
+
+// Normalize restaurant name for consistent comparison
+function normalizeRestaurantName(name) {
+    if (!name) return '';
+    
+    // Convert to lowercase for case-insensitive comparison
+    let normalized = name.toLowerCase();
+    
+    // Remove common prefixes/suffixes for consistent Excel files
+    const prefixes = ['the ', 'restaurant ', 'cafe ', 'café '];
+    const suffixes = [' restaurant', ' cafe', ' café', ' kitchen', ' bar & grill'];
+    
+    // Remove prefixes
+    for (const prefix of prefixes) {
+        if (normalized.startsWith(prefix)) {
+            normalized = normalized.substring(prefix.length);
+        }
+    }
+    
+    // Remove suffixes
+    for (const suffix of suffixes) {
+        if (normalized.endsWith(suffix)) {
+            normalized = normalized.substring(0, normalized.length - suffix.length);
+        }
+    }
+    
+    // Standardize common patterns in restaurant names for consistent Excel files
+    normalized = normalized.replace(/&/g, 'and')  // Replace & with 'and'
+                          .replace(/[',\-]/g, '') // Remove common punctuation
+                          .replace(/\s+/g, ' ')   // Standardize spaces
+                          .trim();                // Remove leading/trailing spaces
+    
+    return normalized;
+}
 
 // Safe initialization with multiple fallbacks
 function safeInit() {
@@ -36,6 +207,91 @@ function safeInit() {
     
     // Query with multiple selector strategies for better element finding
     tryInitFolderUpload();
+
+    // Listen for integrated data events
+    document.addEventListener('integratedDataReady', handleIntegratedDataReady);
+}
+
+/**
+ * Handle when integrated data is available from main app
+ * @param {CustomEvent} event - The integration event with detail containing integrated data
+ */
+function handleIntegratedDataReady(event) {
+    if (event.detail) {
+        console.log("Restaurant visualizer received integrated data");
+        const data = event.detail;
+        
+        // Update restaurant metrics to include conversation counts
+        updateRestaurantMetricsWithIntegratedData(data);
+        
+        // Add relationship counts to restaurant elements
+        updateRestaurantRelationshipCounts(data);
+    }
+}
+
+/**
+ * Update restaurant metrics with conversation data from integration
+ * @param {Object} data - The integrated data object
+ */
+function updateRestaurantMetricsWithIntegratedData(data) {
+    // Check if we have a restaurant metrics panel to update
+    const metricsContainer = document.getElementById('restaurantMetricsPanel');
+    if (!metricsContainer) return;
+    
+    if (data.relationships && data.relationships.length > 0) {
+        // Count unique conversations per restaurant
+        const conversationCounts = {};
+        data.relationships.forEach(rel => {
+            if (!conversationCounts[rel.restaurant]) {
+                conversationCounts[rel.restaurant] = new Set();
+            }
+            conversationCounts[rel.restaurant].add(rel.conversationId);
+        });
+        
+        // Update metrics display if elements exist
+        const conversationsCountEl = document.getElementById('restaurantConversationsCount');
+        if (conversationsCountEl) {
+            const totalRestaurants = Object.keys(conversationCounts).length;
+            conversationsCountEl.textContent = totalRestaurants;
+        }
+        
+        // Update relationship counts
+        const relationshipsCountEl = document.getElementById('restaurantRelationshipsCount');
+        if (relationshipsCountEl) {
+            relationshipsCountEl.textContent = data.relationships.length;
+        }
+    }
+}
+
+/**
+ * Update restaurant elements with relationship counts from integrated data
+ * @param {Object} data - The integrated data object
+ */
+function updateRestaurantRelationshipCounts(data) {
+    if (!data.restaurants || !data.relationships) return;
+    
+    const relationshipsByRestaurant = {};
+    data.relationships.forEach(rel => {
+        if (!relationshipsByRestaurant[rel.restaurant]) {
+            relationshipsByRestaurant[rel.restaurant] = 0;
+        }
+        relationshipsByRestaurant[rel.restaurant]++;
+    });
+    
+    // Update restaurant list items with relationship counts if they exist
+    document.querySelectorAll('[data-restaurant-name]').forEach(el => {
+        const restaurantName = el.dataset.restaurantName;
+        if (restaurantName && relationshipsByRestaurant[restaurantName]) {
+            // Find or create the badge element
+            let badge = el.querySelector('.relationship-badge');
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'badge bg-info relationship-badge ms-1';
+                el.appendChild(badge);
+            }
+            badge.textContent = relationshipsByRestaurant[restaurantName];
+        }
+    });
 }
 
 // Try multiple strategies to find upload elements
@@ -172,7 +428,8 @@ function setupFolderUploadHandlers(uploadArea, folderInput) {
                 labels: [],
                 categories: {},
                 loaded: false,
-                currentVisualization: null
+                currentVisualization: null,
+                sheetRestaurants: window.restaurantData.sheetRestaurants // Keep sheet restaurants data
             };
             
             // Hide selected file info
@@ -237,6 +494,57 @@ function setupFolderUploadHandlers(uploadArea, folderInput) {
         console.log(`Processing ${jsonFiles.length} JSON files`);
         statusText.textContent = `Processing ${jsonFiles.length} files...`;
         
+        // Check if we need to wait for sheet restaurants
+        if (window.restaurantData.sheetRestaurants.length === 0) {
+            statusText.textContent = `Waiting for restaurant data...`;
+            console.log('No sheet restaurants available. Please upload an Excel file first or waiting for data to load.');
+            showRestaurantNotification('Waiting for restaurant data from Excel file. If you haven\'t uploaded an Excel file yet, please do so.', 'info');
+            
+            // Set up a one-time event listener to continue processing after sheet restaurants are loaded
+            const processAfterSheetRestaurants = function() {
+                window.removeEventListener('sheetRestaurantsReady', processAfterSheetRestaurants);
+                window.removeEventListener('sheetRestaurantsLoaded', processAfterSheetRestaurants);
+                console.log('Sheet restaurants now available, continuing with JSON processing');
+                processJsonFiles(jsonFiles);
+            };
+            
+            window.addEventListener('sheetRestaurantsReady', processAfterSheetRestaurants);
+            window.addEventListener('sheetRestaurantsLoaded', processAfterSheetRestaurants);
+            
+            // Try to fetch sheet restaurants in case they exist but weren't loaded yet
+            fetchSheetRestaurants();
+        } else {
+            // We already have sheet restaurants, proceed immediately
+            processJsonFiles(jsonFiles);
+        }
+    }
+    
+    // Show notification with multiple types
+    function showRestaurantNotification(message, type = 'info') {
+        // Use notification system if available
+        if (typeof showNotification === 'function') {
+            showNotification(message, type);
+        } else {
+            console.log(`[${type}] ${message}`);
+            if (type === 'error') {
+                alert(message);
+            }
+        }
+    }
+    
+    // New helper function to process JSON files after we have sheet restaurants
+    function processJsonFiles(jsonFiles) {
+        // Get references to status elements since this is now called from different contexts
+        const statusElement = document.getElementById('folder-status');
+        const statusText = statusElement ? statusElement.querySelector('#folder-status-text') : null;
+        
+        if (!statusText) {
+            console.error('Status text element not found');
+            return;
+        }
+        
+        statusText.textContent = `Processing ${jsonFiles.length} files...`;
+        
         // Process each JSON file
         const categories = {};
         const vectors = [];
@@ -247,6 +555,7 @@ function setupFolderUploadHandlers(uploadArea, folderInput) {
             const reader = new FileReader();
             
             reader.onload = function(e) {
+                // ... existing code for reading and processing JSON files ...
                 try {
                     const content = e.target.result;
                     const data = JSON.parse(content);
@@ -292,37 +601,141 @@ function setupFolderUploadHandlers(uploadArea, folderInput) {
                 
                 processedCount++;
                 const progress = Math.floor((processedCount / jsonFiles.length) * 100);
-                statusElement.querySelector('.progress-bar').style.width = `${progress}%`;
+                if (statusElement && statusElement.querySelector('.progress-bar')) {
+                    statusElement.querySelector('.progress-bar').style.width = `${progress}%`;
+                }
                 statusText.textContent = `Processed ${processedCount}/${jsonFiles.length} files`;
                 
                 // Check if all files have been processed
                 if (processedCount === jsonFiles.length) {
-                    if (vectors.length > 0) {
-                        window.restaurantData = {
-                            raw: null,
-                            vectors: vectors,
-                            labels: labels,
-                            categories: categories,
-                            loaded: true,
-                            currentVisualization: null
-                        };
-                        
-                        updateRestaurantMetrics();
-                        renderCategoryHierarchy();
-                        showRestaurantSuccess(`Loaded ${vectors.length} embeddings from ${Object.keys(categories).length} categories`);
-                    } else {
-                        showRestaurantError('No valid embedding vectors found in the uploaded files');
-                    }
+                    finishJsonProcessing(vectors, labels, categories);
                 }
             };
             
             reader.onerror = function() {
                 console.error(`Error reading file ${file.name}`);
                 processedCount++;
+                // Check if all files have been processed
+                if (processedCount === jsonFiles.length) {
+                    finishJsonProcessing(vectors, labels, categories);
+                }
             };
             
             reader.readAsText(file);
         });
+    }
+    
+    // New helper function to finalize JSON processing
+    function finishJsonProcessing(vectors, labels, categories) {
+        if (vectors.length > 0) {
+            console.log(`Finished processing with ${vectors.length} vectors from ${Object.keys(categories).length} categories`);
+            
+            window.restaurantData = {
+                raw: null,
+                vectors: vectors,
+                labels: labels,
+                categories: categories,
+                loaded: true,
+                currentVisualization: null,
+                sheetRestaurants: window.restaurantData.sheetRestaurants // Keep sheet restaurants data
+            };
+            
+            updateRestaurantMetrics();
+            renderCategoryHierarchy();
+            showRestaurantSuccess(`Loaded ${vectors.length} embeddings from ${Object.keys(categories).length} categories`);
+            
+            // Process restaurant data from labels
+            const restaurants = processRestaurantsFromLabels(labels, categories);
+            window.restaurantData.restaurants = restaurants;
+            
+            // Dispatch event for other modules that need restaurant data
+            window.dispatchEvent(new CustomEvent('restaurantDataLoaded', {
+                detail: { restaurants }
+            }));
+        } else {
+            showRestaurantError('No valid embedding vectors found in the uploaded files');
+        }
+    }
+    
+    // Helper function to process restaurant data from labels with improved sheet name matching
+    function processRestaurantsFromLabels(labels, categories) {
+        // This function extracts restaurant information from embeddings data
+        const restaurants = [];
+        const { sheetRestaurants } = window.restaurantData;
+        
+        try {
+            // Group by restaurant if possible
+            const restaurantMap = {};
+            
+            // First pass: prioritize known sheet restaurant names from Excel
+            if (sheetRestaurants && sheetRestaurants.length > 0) {
+                sheetRestaurants.forEach((sheetName, index) => {
+                    restaurantMap[sheetName] = {
+                        id: `restaurant-sheet-${index}`,
+                        name: sheetName,
+                        displayName: sheetName,
+                        categories: {},
+                        isSheetName: true,
+                        source: 'sheet_name'
+                    };
+                });
+            }
+            
+            // ...existing code for processing labels...
+            
+            // Merge any found categories into sheet restaurant entries
+            labels.forEach((label) => {
+                if (typeof label === 'object' && label.category && label.concept) {
+                    // Get restaurant name and find best match in sheet names
+                    let restaurantName = label.restaurant || 'Unknown Restaurant';
+                    let matchedSheetName = null;
+                    
+                    // Explicitly look for sheet name match
+                    if (sheetRestaurants && sheetRestaurants.length > 0) {
+                        matchedSheetName = findMatchingSheetRestaurant(restaurantName, sheetRestaurants);
+                    }
+                    
+                    // Use matched sheet name if found, otherwise use original name
+                    const finalRestaurantName = matchedSheetName || restaurantName;
+                    
+                    // Add to restaurant map
+                    if (!restaurantMap[finalRestaurantName]) {
+                        restaurantMap[finalRestaurantName] = {
+                            id: `restaurant-${finalRestaurantName.replace(/\s+/g, '-').toLowerCase()}`,
+                            name: finalRestaurantName,
+                            displayName: finalRestaurantName,
+                            categories: {},
+                            isSheetName: !!matchedSheetName,
+                            source: matchedSheetName ? 'matched_sheet_name' : 'label'
+                        };
+                    }
+                    
+                    // Add category and concept
+                    if (!restaurantMap[finalRestaurantName].categories[label.category]) {
+                        restaurantMap[finalRestaurantName].categories[label.category] = [];
+                    }
+                    
+                    restaurantMap[finalRestaurantName].categories[label.category].push({
+                        name: label.concept,
+                        confidence: label.confidence || 1.0
+                    });
+                }
+                // ...existing code for other label formats...
+            });
+            
+            // ...rest of existing function...
+        } catch (error) {
+            console.error('Error processing restaurants from labels:', error);
+        }
+        
+        return restaurants;
+    }
+    
+    // Extract sheet name from string label if available
+    function extractSheetNameFromString(labelStr) {
+        // Check if label contains sheet name in format like [SheetName] Category -> Concept
+        const match = labelStr.match(/^\[([^\]]+)\]/);
+        return match ? match[1] : null;
     }
     
     // Show error message

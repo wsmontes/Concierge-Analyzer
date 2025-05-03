@@ -9,12 +9,15 @@ if (typeof window.DebugInsightsModule === 'undefined') {
     // Store insights data globally within this module for deferred rendering
     let globalInsightsData = null;
     let crossConversationData = null;
+    let integratedData = null;
+    let embeddingsData = null;
 
     // Track chart instances so we can destroy them before recreating
     let chartInstances = {
         categoryDistribution: null,
         conceptDistribution: null,
-        restaurantDistribution: null
+        restaurantDistribution: null,
+        embeddingsDistribution: null
     };
 
     // Add a flag to track if rendering is in progress to prevent simultaneous renders
@@ -23,6 +26,8 @@ if (typeof window.DebugInsightsModule === 'undefined') {
     // Create a namespace to expose functions to other modules
     window.DebugInsightsModule = {
         initializeDebugInsights: initializeDebugInsights,
+        updateWithIntegratedData: updateWithIntegratedData,
+        handleEmbeddingsLoaded: handleEmbeddingsLoaded,
         isInitialized: true
     };
 
@@ -44,8 +49,228 @@ if (typeof window.DebugInsightsModule === 'undefined') {
             console.log("Refresh associations event received");
             fetchDebugAnalysisData();
         });
+        
+        // Listen for embeddings data loaded events
+        document.addEventListener('embeddingsLoaded', function(event) {
+            console.log("Debug insights: Embeddings data loaded event received");
+            handleEmbeddingsLoaded(event.detail);
+        });
     }
     
+    // Handle when embeddings data is loaded
+    function handleEmbeddingsLoaded(data) {
+        console.log('Debug insights received embeddings data:', data ? 'Data available' : 'No data');
+        
+        // Store embeddings data for later use
+        embeddingsData = data;
+        
+        // Only update visualizations if the debug section is active
+        const debugSection = document.getElementById('debug-insights-section');
+        if (debugSection && debugSection.classList.contains('active')) {
+            // Update embeddings visualizations
+            displayEmbeddingsVisualizations();
+        }
+    }
+    
+    // Display embeddings visualizations in the debug insights section
+    function displayEmbeddingsVisualizations() {
+        if (!embeddingsData || !embeddingsData.loaded || !embeddingsData.vectors || embeddingsData.vectors.length === 0) {
+            console.warn('No embeddings data available for visualization in debug insights');
+            showNoEmbeddingsMessage('debug-embeddings-container');
+            return;
+        }
+        
+        try {
+            // Make sure we have a container for embeddings visualizations
+            const container = document.getElementById('debug-embeddings-container');
+            if (!container) {
+                console.warn('Debug embeddings container not found');
+                return;
+            }
+            
+            // Clear any existing content or error messages
+            container.innerHTML = '';
+            
+            // Create a card for embeddings visualization
+            const card = document.createElement('div');
+            card.className = 'card shadow-sm mb-3';
+            card.innerHTML = `
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-diagram-3 me-2"></i>
+                        Embeddings Overview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="d-flex flex-column align-items-center mb-3">
+                                <div style="height: 200px; width: 100%;">
+                                    <canvas id="debug-embeddings-distribution-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted">Embeddings Statistics</h6>
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Vectors
+                                            <span class="badge bg-primary rounded-pill" id="debug-embeddings-count">${embeddingsData.vectors.length}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Dimensions
+                                            <span class="badge bg-primary rounded-pill" id="debug-embeddings-dimensions">${embeddingsData.vectors[0]?.length || 'Unknown'}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Categories
+                                            <span class="badge bg-primary rounded-pill" id="debug-embeddings-categories">${Object.keys(embeddingsData.categories || {}).length}</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add the card to the container
+            container.appendChild(card);
+            
+            // Create embeddings distribution chart
+            setTimeout(() => {
+                displayEmbeddingsDistributionChart();
+            }, 100);
+            
+            console.log('Embeddings visualizations displayed in debug insights');
+        } catch (error) {
+            console.error('Error displaying embeddings visualizations:', error);
+            const container = document.getElementById('debug-embeddings-container');
+            if (container) {
+                container.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        Error displaying embeddings: ${error.message}
+                    </div>
+                `;
+            }
+        }
+    }
+    
+    // Display embeddings distribution chart
+    function displayEmbeddingsDistributionChart() {
+        if (!embeddingsData || !embeddingsData.vectors || embeddingsData.vectors.length === 0) {
+            console.warn('No embeddings vectors data available for chart');
+            return;
+        }
+        
+        const canvasElement = document.getElementById('debug-embeddings-distribution-chart');
+        if (!canvasElement) {
+            console.warn("Canvas element 'debug-embeddings-distribution-chart' not found");
+            return;
+        }
+        
+        try {
+            // Ensure any existing chart on this canvas is destroyed
+            const existingChart = Chart.getChart(canvasElement);
+            if (existingChart) {
+                console.log("Found existing embeddings chart, destroying it");
+                existingChart.destroy();
+            }
+            
+            const ctx = canvasElement.getContext('2d');
+            if (!ctx) {
+                console.warn("Could not get context for 'debug-embeddings-distribution-chart'");
+                return;
+            }
+            
+            // Prepare category distribution data if categories are available
+            let labels = [];
+            let values = [];
+            
+            if (embeddingsData.categories && Object.keys(embeddingsData.categories).length > 0) {
+                // Count embeddings by category
+                const categoryCounts = {};
+                Object.keys(embeddingsData.categories).forEach(category => {
+                    categoryCounts[category] = embeddingsData.categories[category].length;
+                });
+                
+                // Convert to arrays for the chart
+                const sortedCategories = Object.entries(categoryCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10);  // Take top 10
+                
+                labels = sortedCategories.map(item => item[0]);
+                values = sortedCategories.map(item => item[1]);
+            } else {
+                // If no categories, just show the total count
+                labels = ['Embeddings'];
+                values = [embeddingsData.vectors.length];
+            }
+            
+            // Create and store chart reference
+            chartInstances.embeddingsDistribution = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(255, 206, 86, 0.6)',
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(255, 99, 132, 0.6)',
+                            'rgba(153, 102, 255, 0.6)',
+                            'rgba(255, 159, 64, 0.6)',
+                            'rgba(199, 199, 199, 0.6)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                boxWidth: 10,
+                                font: {
+                                    size: 10
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Embeddings by Category'
+                        }
+                    }
+                }
+            });
+            
+            console.log("Embeddings distribution chart created successfully");
+        } catch (error) {
+            console.error("Error creating embeddings distribution chart:", error);
+            throw error;
+        }
+    }
+    
+    // Show message when no embeddings data is available
+    function showNoEmbeddingsMessage(containerId) {
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.innerHTML = `
+                <div class="d-flex flex-column align-items-center justify-content-center p-4">
+                    <div class="text-center text-muted">
+                        <i class="bi bi-cloud-upload fs-1 mb-3"></i>
+                        <h5>No Embeddings Data Available</h5>
+                        <p>Please upload an embeddings JSON file using the uploader in the sidebar.</p>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
     // Extract the fetch logic to a separate function for reuse
     function fetchDebugAnalysisData() {
         fetch(`${CONFIG.API_URL}/debug_analysis`)
@@ -210,6 +435,11 @@ if (typeof window.DebugInsightsModule === 'undefined') {
                 displayCrossConversationInsights(crossConversationData);
             } else {
                 console.warn("No cross conversation data available");
+            }
+            
+            // Add embeddings visualization if available
+            if (embeddingsData && embeddingsData.loaded) {
+                displayEmbeddingsVisualizations();
             }
         } catch (error) {
             console.error("Error rendering debug insights:", error);
@@ -1338,6 +1568,96 @@ if (typeof window.DebugInsightsModule === 'undefined') {
                 
                 conceptsTable.appendChild(row);
             });
+        }
+    }
+
+    /**
+     * Update debug insights with integrated data from multiple sources
+     * @param {Object} data - The integrated data object containing concepts, restaurants and relationships
+     */
+    function updateWithIntegratedData(data) {
+        if (!data) {
+            console.warn("No integrated data provided to updateWithIntegratedData");
+            return;
+        }
+
+        console.log("Updating debug insights with integrated data");
+        integratedData = data;
+
+        // Update relationship counts in the UI if elements exist
+        updateElementText('debug-relationship-count', data.relationships ? data.relationships.length : 0);
+        updateElementText('debug-integrated-concept-count', Object.keys(data.concepts || {}).length);
+        updateElementText('debug-integrated-restaurant-count', Object.keys(data.restaurants || {}).length);
+
+        // Create synthetic insights data structure for visualization
+        const syntheticInsights = createSyntheticInsightsFromIntegrated(data);
+        
+        // Display integrated data visualizations
+        try {
+            displayIntegratedDataVisualizations(syntheticInsights);
+        } catch (error) {
+            console.error("Error displaying integrated data visualizations:", error);
+        }
+
+        // Dispatch event in case other components need to know integrated data is ready in debug insights
+        document.dispatchEvent(new CustomEvent('debugInsights:integratedDataReady'));
+    }
+
+    /**
+     * Create synthetic insights data structure from integrated data
+     * @param {Object} data - The integrated data object
+     * @returns {Array} - An array of synthetic insights objects
+     */
+    function createSyntheticInsightsFromIntegrated(data) {
+        const insights = [];
+        
+        // Basic stats insight
+        insights.push({
+            type: 'basic_stats',
+            data: {
+                unique_categories: Object.keys(data.categoryCounts || {}).length,
+                unique_concepts: Object.keys(data.concepts || {}).length,
+                unique_restaurants: Object.keys(data.restaurants || {}).length,
+                association_count: data.relationships ? data.relationships.length : 0
+            }
+        });
+
+        // Category distribution insight
+        const categoryData = [];
+        if (data.categoryCounts) {
+            Object.entries(data.categoryCounts).forEach(([category, count]) => {
+                categoryData.push([category, count]);
+            });
+        }
+        
+        insights.push({
+            type: 'category_distribution',
+            data: {
+                categories: categoryData.sort((a, b) => b[1] - a[1]).slice(0, 10)
+            }
+        });
+
+        // Add other synthetic insights as needed
+        return insights;
+    }
+
+    /**
+     * Display visualizations based on integrated data
+     * @param {Array} insights - Array of synthetic insights objects
+     */
+    function displayIntegratedDataVisualizations(insights) {
+        // Update the existing debug insights with our synthetic ones
+        if (globalInsightsData) {
+            // Merge insights, replacing any with same type
+            const existingTypes = new Set(insights.map(i => i.type));
+            const filteredOriginal = globalInsightsData.filter(i => !existingTypes.has(i.type));
+            globalInsightsData = [...filteredOriginal, ...insights];
+            
+            // Re-render if the debug section is visible
+            const debugSection = document.getElementById('debug-insights-section');
+            if (debugSection && debugSection.classList.contains('active')) {
+                renderDebugInsights();
+            }
         }
     }
 } else {

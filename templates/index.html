@@ -53,13 +53,26 @@
                 <li class="menu-item" data-target="restaurant-visualization-section">
                     <a href="#restaurant-visualization"><i class="bi bi-graph-up-arrow"></i> Restaurant Analysis</a>
                 </li>
+                <li class="menu-item" data-target="restaurant-detail-section">
+                    <a href="#restaurant-detail"><i class="bi bi-cup-hot"></i> Restaurant Detail</a>
+                </li>
             </ul>
             
             <div class="sidebar-footer">
+                <div class="sidebar-upload-group d-flex gap-2 mb-3">
+                    <div class="sidebar-upload-item">
+                        {% include 'partials/upload-form.html' %}
+                    </div>
+                    <div class="sidebar-upload-item">
+                        {% include 'partials/embeddings-upload.html' %}
+                    </div>
+                    <div class="sidebar-upload-item">
+                        {% include 'partials/folder-upload.html' %}
+                    </div>
+                </div>
                 <button id="theme-toggle" class="btn btn-sm btn-icon" title="Toggle Theme">
                     <i class="bi bi-sun"></i>
                 </button>
-                <!-- Export PDF button in sidebar removed -->
             </div>
         </nav>
         
@@ -75,25 +88,14 @@
                     <h1 id="current-section-title">Dashboard</h1>
                 </div>
                 
-                <!-- Header Upload Forms Container -->
-                <div class="header-uploads-container d-flex gap-2 mx-2">
-                    <div class="header-upload-item">
-                        {% include 'partials/upload-form.html' %}
-                    </div>
-                    <div class="header-upload-item">
-                        {% include 'partials/embeddings-upload.html' %}
-                    </div>
-                    <div class="header-upload-item">
-                        {% include 'partials/folder-upload.html' %}
-                    </div>
-                </div>
+                <!-- Header Upload Forms Container removed -->
                 
                 <div class="top-navbar-actions">
                     <button id="refresh-data" class="btn btn-sm btn-icon" title="Refresh Data">
                         <i class="bi bi-arrow-clockwise"></i>
                     </button>
-                    <button id="export-pdf" class="btn btn-sm btn-primary d-none d-md-flex">
-                        <i class="bi bi-file-earmark-pdf me-2"></i>Export Report
+                    <button id="export-pdf" class="btn btn-sm btn-icon d-none d-md-block" title="Export Report (PDF)">
+                        <i class="bi bi-file-earmark-pdf"></i>
                     </button>
                 </div>
             </header>
@@ -467,12 +469,17 @@
                         </div>
                     </section>
                     
-                    <!-- Restaurant Visualization Section - New section -->
+                    <!-- Restaurant Visualization Section -->
                     <section id="restaurant-visualization-section" class="content-section">
                         {% include 'partials/tabs/restaurant-visualization.html' %}
                     </section>
 
-                    <!-- Recommendations Section - Now only contains the comparison table -->
+                    <!-- Restaurant Detail Section -->
+                    <section id="restaurant-detail-section" class="content-section">
+                        {% include 'partials/tabs/restaurant-detail.html' %}
+                    </section>
+
+                    <!-- Recommendations Section -->
                     <section id="recommendations-section" class="content-section">
                         <div class="dashboard-card">
                             <div class="card-header">
@@ -566,5 +573,6 @@
     </script>
     <script src="{{ url_for('static', filename='js/embeddings-parser.js') }}"></script>
     <script src="{{ url_for('static', filename='js/restaurant-visualizer.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/restaurant-detail.js') }}"></script>
 </body>
 </html>

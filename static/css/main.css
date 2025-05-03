@@ -163,8 +163,115 @@ body {
     padding: 15px;
     border-top: 1px solid var(--border-color);
     display: flex;
+    flex-direction: column;
     align-items: center;
+}
+
+.sidebar-upload-group {
+    width: 100%;
+    display: flex;
     justify-content: space-between;
+}
+
+.sidebar-upload-item {
+    flex: 1;
+    max-width: 70px;
+}
+
+.sidebar-upload-item .simple-drop-container {
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar-upload-item .simple-drop-area {
+    min-height: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--sidebar-bg);
+}
+
+.sidebar-upload-item .simple-drop-area:hover,
+.sidebar-upload-item .simple-drop-area.dragover {
+    border-color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.05);
+}
+
+.sidebar-upload-item .upload-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.sidebar-upload-item .upload-placeholder i {
+    font-size: 0.9rem;
+    color: var(--sidebar-text);
+    margin: 0;
+}
+
+.sidebar-upload-item .upload-placeholder .micro-text {
+    display: none;
+}
+
+.sidebar-upload-item .selected-file {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    height: 100%;
+}
+
+.sidebar-upload-item .selected-file i {
+    font-size: 0.8rem;
+    color: var(--bs-success);
+}
+
+.sidebar-upload-item .selected-file .file-name {
+    display: none;
+}
+
+.sidebar-upload-item .selected-file button {
+    padding: 0;
+    margin-left: 3px;
+}
+
+/* Hide status elements in sidebar to save space */
+.sidebar-upload-item #embeddings-status,
+.sidebar-upload-item #folder-status {
+    display: none !important;
+}
+
+/* Show tooltip on hover for better UX */
+.sidebar-upload-item .simple-drop-area {
+    position: relative;
+}
+
+.sidebar-upload-item .simple-drop-area::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+    white-space: nowrap;
+    z-index: 100;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    pointer-events: none;
+}
+
+.sidebar-upload-item .simple-drop-area:hover::after {
+    opacity: 1;
+    visibility: visible;
 }
 
 .btn-icon {
