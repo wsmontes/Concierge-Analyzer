@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="/static/css/conversations.css">
     <link rel="stylesheet" href="/static/css/debug-insights.css">
     <script src="{{ url_for('static', filename='js/embeddings-parser.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/restaurant-visualizer.js') }}"></script>
 </head>
 <body>
     <div class="app-container">
@@ -32,9 +33,10 @@
                 </button>
             </div>
             
-            <!-- Include the upload form in the sidebar -->
+            <!-- Include the upload forms in the sidebar -->
             {% include 'partials/upload-form.html' %}
             {% include 'partials/embeddings-upload.html' %}
+            {% include 'partials/folder-upload.html' %}
             
             <ul class="sidebar-menu">
                 <li class="menu-header">ANALYTICS</li>
@@ -53,6 +55,9 @@
                 </li>
                 <li class="menu-item" data-target="debug-insights-section">
                     <a href="#debug-insights"><i class="bi bi-bug"></i> Debug Insights</a>
+                </li>
+                <li class="menu-item" data-target="restaurant-visualization-section">
+                    <a href="#restaurant-visualization"><i class="bi bi-graph-up-arrow"></i> Restaurant Analysis</a>
                 </li>
             </ul>
             
@@ -457,6 +462,11 @@
                         </div>
                     </section>
                     
+                    <!-- Restaurant Visualization Section - New section -->
+                    <section id="restaurant-visualization-section" class="content-section">
+                        {% include 'partials/tabs/restaurant-visualization.html' %}
+                    </section>
+
                     <!-- Recommendations Section - Now only contains the comparison table -->
                     <section id="recommendations-section" class="content-section">
                         <div class="dashboard-card">

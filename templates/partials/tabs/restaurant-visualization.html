@@ -1,0 +1,172 @@
+<!-- 
+  Restaurant data visualization component for Concierge Chat Analyzer
+  Provides visualization tools for analyzing restaurant categories and concepts
+-->
+<div class="dashboard-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h3><i class="bi bi-graph-up-arrow me-2"></i>Restaurant Category Insights</h3>
+        <div>
+            <button class="btn btn-sm btn-outline-secondary" id="refreshRestaurantViz">
+                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <ul class="nav nav-tabs p-2 bg-light" id="restaurantVisualizationTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="hierarchy-tab" data-bs-toggle="tab" data-bs-target="#hierarchy" type="button" role="tab">
+                    <i class="bi bi-diagram-3 me-1"></i>Category Hierarchy
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="similarity-tab" data-bs-toggle="tab" data-bs-target="#similarity" type="button" role="tab">
+                    <i class="bi bi-grid-3x3 me-1"></i>Semantic Similarity
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="distribution-tab" data-bs-toggle="tab" data-bs-target="#distribution" type="button" role="tab">
+                    <i class="bi bi-bar-chart-line me-1"></i>Category Distribution
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="clustering-tab" data-bs-toggle="tab" data-bs-target="#clustering" type="button" role="tab">
+                    <i class="bi bi-hexagon-half me-1"></i>Concept Clustering
+                </button>
+            </li>
+        </ul>
+            
+        <div class="tab-content p-3" id="restaurantVisualizationTabsContent">
+            <!-- Category Hierarchy Visualization -->
+            <div class="tab-pane fade show active" id="hierarchy" role="tabpanel" aria-labelledby="hierarchy-tab">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">Hierarchy Options</h6>
+                                <div class="mb-3">
+                                    <label for="hierarchyType" class="form-label">Visualization Type</label>
+                                    <select class="form-select form-select-sm" id="hierarchyType">
+                                        <option value="sunburst">Sunburst Chart</option>
+                                        <option value="treemap">Tree Map</option>
+                                        <option value="circlepack">Circle Packing</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="hierarchyColorScheme" class="form-label">Color Scheme</label>
+                                    <select class="form-select form-select-sm" id="hierarchyColorScheme">
+                                        <option value="viridis">Viridis</option>
+                                        <option value="plasma">Plasma</option>
+                                        <option value="category10">Category10</option>
+                                    </select>
+                                </div>
+                                <div class="d-grid">
+                                    <button class="btn btn-sm btn-primary" id="updateHierarchyViz">
+                                        <i class="bi bi-arrow-repeat me-1"></i>Update 
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h6 class="card-title">Description</h6>
+                                <p class="small">This visualization shows the hierarchical relationship between restaurant categories and their concepts. Each category contains multiple concepts that define the restaurant.</p>
+                                <p class="small">The size of each segment represents the number of concepts within each category. Click on a category to zoom in.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-9">
+                        <div class="visualization-container bg-white rounded p-2 shadow-sm" id="hierarchyViz" style="height: 500px;"></div>
+                    </div>
+                </div>
+            </div>
+                
+            <!-- Semantic Similarity Visualization -->
+            <div class="tab-pane fade" id="similarity" role="tabpanel" aria-labelledby="similarity-tab">
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle me-1"></i>Semantic Similarity</h6>
+                    <p class="mb-0">Visualize how different concepts relate to each other based on their embedding vectors. Similar concepts appear closer together in the visualization.</p>
+                </div>
+                <div class="visualization-container bg-white rounded p-2 shadow-sm" id="similarityViz" style="height: 500px;"></div>
+            </div>
+                
+            <!-- Category Distribution Analysis -->
+            <div class="tab-pane fade" id="distribution" role="tabpanel" aria-labelledby="distribution-tab">
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle me-1"></i>Category Distribution</h6>
+                    <p class="mb-0">See the distribution of categories and the number of concepts within each category. Explore which categories are most represented in the dataset.</p>
+                </div>
+                <div class="visualization-container bg-white rounded p-2 shadow-sm" id="distributionViz" style="height: 500px;"></div>
+            </div>
+                
+            <!-- Concept Clustering -->
+            <div class="tab-pane fade" id="clustering" role="tabpanel" aria-labelledby="clustering-tab">
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle me-1"></i>Concept Clustering</h6>
+                    <p class="mb-0">See how concepts naturally cluster together based on their embedding similarity, regardless of their predefined categories.</p>
+                </div>
+                <div class="visualization-container bg-white rounded p-2 shadow-sm" id="clusteringViz" style="height: 500px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Restaurant Data Analysis Dashboard -->
+<div class="dashboard-card mt-4">
+    <div class="card-header">
+        <h3><i class="bi bi-clipboard-data me-2"></i>Restaurant Embeddings Analysis</h3>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Dimensionality</h6>
+                        <h3 id="dimensions" class="mb-0">-</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Data Points</h6>
+                        <h3 id="dataPoints" class="mb-0">-</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Categories</h6>
+                        <h3 id="categoryCount" class="mb-0">-</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h6 class="text-muted">Concepts</h6>
+                        <h3 id="conceptCount" class="mb-0">-</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="categoryBreakdownSection" class="mt-4 d-none">
+            <h5 class="mb-3">Category Breakdown</h5>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Category</th>
+                            <th>Concepts</th>
+                            <th>Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody id="categoryTable">
+                        <!-- Will be populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
