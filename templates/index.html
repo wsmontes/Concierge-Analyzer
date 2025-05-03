@@ -69,34 +69,48 @@
         <div class="main-content">
             <!-- Top Navigation Bar -->
             <header class="top-navbar">
-                <button id="mobile-sidebar-toggle" class="btn btn-sm btn-icon d-lg-none">
-                    <i class="bi bi-list"></i>
-                </button>
-                
-                <div class="page-title">
-                    <h1 id="current-section-title">Dashboard</h1>
-                </div>
-                
-                <!-- Header Upload Forms Container -->
-                <div class="header-uploads-container d-flex gap-2 mx-2">
-                    <div class="header-upload-item">
-                        {% include 'partials/upload-form.html' %}
+                <div class="top-navbar-left">
+                    <button id="mobile-sidebar-toggle" class="btn btn-sm btn-icon d-lg-none">
+                        <i class="bi bi-list"></i>
+                    </button>
+                    
+                    <div class="app-brand">
+                        <img src="/static/images/Lotier_Logo.gif" alt="Lotier" class="header-logo">
                     </div>
-                    <div class="header-upload-item">
-                        {% include 'partials/embeddings-upload.html' %}
-                    </div>
-                    <div class="header-upload-item">
-                        {% include 'partials/folder-upload.html' %}
+                    
+                    <div class="page-title">
+                        <h1 id="current-section-title">Dashboard</h1>
+                        <p class="page-subtitle">Upload a WhatsApp chat export to analyze Concierge AI performance</p>
                     </div>
                 </div>
                 
-                <div class="top-navbar-actions">
-                    <button id="refresh-data" class="btn btn-sm btn-icon" title="Refresh Data">
-                        <i class="bi bi-arrow-clockwise"></i>
-                    </button>
-                    <button id="export-pdf" class="btn btn-sm btn-primary d-none d-md-flex">
-                        <i class="bi bi-file-earmark-pdf me-2"></i>Export Report
-                    </button>
+                <div class="top-navbar-right">
+                    <!-- Header Upload Forms Container -->
+                    <div class="header-uploads-container">
+                        <div class="header-upload-item">
+                            {% include 'partials/upload-form.html' %}
+                        </div>
+                        <span class="header-divider"></span>
+                        <div class="header-upload-item">
+                            {% include 'partials/embeddings-upload.html' %}
+                        </div>
+                        <span class="header-divider"></span>
+                        <div class="header-upload-item">
+                            {% include 'partials/folder-upload.html' %}
+                        </div>
+                    </div>
+                    
+                    <div class="top-navbar-actions">
+                        <button id="refresh-data" class="btn btn-icon" title="Refresh Data">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        <button id="export-pdf" class="btn btn-primary d-none d-md-flex">
+                            <i class="bi bi-file-earmark-pdf me-2"></i>Export Report
+                        </button>
+                        <button id="export-pdf-mobile" class="btn btn-icon btn-primary d-md-none d-flex d-none">
+                            <i class="bi bi-file-earmark-pdf"></i>
+                        </button>
+                    </div>
                 </div>
             </header>
             

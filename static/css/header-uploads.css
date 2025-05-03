@@ -1,94 +1,273 @@
 /**
  * Header Upload Components Styling
  * Provides styling for upload forms relocated to the top navigation bar
- * Dependencies: main.css for base upload styling
  */
 
-/* Header Upload Forms Container */
-.header-uploads-container {
+/* Top navbar structure */
+.top-navbar {
+    background-color: var(--header-bg);
+    padding: 0 20px;
     display: flex;
-    flex-grow: 1;
-    justify-content: center;
     align-items: center;
-    gap: 10px;
-    margin: 0 15px;
+    justify-content: space-between;
+    height: 70px;
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 1020;
 }
 
-/* Individual Header Upload Item */
+/* Left side of navbar containing logo and title */
+.top-navbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 100%;
+}
+
+/* Right side of navbar containing actions and uploads */
+.top-navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 100%;
+}
+
+/* Logo styling */
+.app-brand {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding-right: 16px;
+    border-right: 1px solid var(--border-color);
+}
+
+.header-logo {
+    height: 40px;
+    width: auto;
+    object-fit: contain;
+}
+
+/* Page title container */
+.page-title {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.page-title h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.page-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin: 0;
+    max-width: 400px;
+}
+
+/* Top navbar actions container */
+.top-navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 16px;
+    border-left: 1px solid var(--border-color);
+    height: 100%;
+}
+
+/* Header Upload Items */
+.header-uploads-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .header-upload-item {
-    max-width: 220px;
-    min-width: 150px;
-    flex: 1;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Remove margin from upload containers inside header */
 .header-upload-item .simple-drop-container {
     padding: 0;
     margin: 0;
+    height: 36px;
+    width: 36px;
 }
 
-/* Make header upload areas smaller */
+/* Make header upload areas icon-like buttons */
 .header-upload-item .simple-drop-area {
-    min-height: 40px;
-    padding: 6px;
-    border-width: 1px;
+    min-height: unset;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease;
+}
+
+.header-upload-item .simple-drop-area:hover {
+    background-color: var(--sidebar-item-hover);
+}
+
+.header-upload-item .simple-drop-area.dragover {
+    background-color: var(--sidebar-active-bg);
 }
 
 /* Adjust icon size in header uploads */
-.header-upload-item .upload-placeholder i {
-    font-size: 0.9rem;
-    margin-bottom: 2px;
+.header-upload-item .upload-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
 }
 
-/* Smaller text for header uploads */
-.header-upload-item .upload-placeholder .micro-text {
-    font-size: 0.7rem;
+.header-upload-item .upload-placeholder i {
+    font-size: 1rem;
     margin: 0;
+    color: var(--text-secondary);
+}
+
+/* Hide text for icon-only display */
+.header-upload-item .upload-placeholder .micro-text {
+    display: none;
+}
+
+/* Tooltips for better UX */
+.header-upload-item .simple-drop-area:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--card-bg);
+    color: var(--text-primary);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    box-shadow: var(--card-shadow);
     white-space: nowrap;
+    z-index: 100;
 }
 
 /* Adjust selected file display */
 .header-upload-item .selected-file {
-    padding: 4px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background-color: transparent;
+    border: none;
 }
 
 .header-upload-item .selected-file i {
-    font-size: 0.8rem;
+    font-size: 1rem;
+    color: var(--bs-success);
+    margin: 0;
 }
 
-.header-upload-item .selected-file .file-name {
+.header-upload-item .selected-file .file-name,
+.header-upload-item .selected-file button {
+    display: none;
+}
+
+/* Status indicators */
+.status-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    white-space: nowrap;
+    z-index: 10;
     font-size: 0.7rem;
-    max-width: 120px;
+    background-color: var(--card-bg);
+    border-radius: 4px;
+    padding: 2px 5px;
+    box-shadow: var(--card-shadow);
+    margin-top: 3px;
 }
 
-/* Hide status elements in header to save space */
-.header-upload-item #embeddings-status,
-.header-upload-item #folder-status {
-    display: none !important;
+/* Create a divider between header elements */
+.header-divider {
+    width: 1px;
+    height: 24px;
+    background-color: var(--border-color);
+    margin: 0 4px;
 }
 
-/* Responsive adjustments for header uploads */
-@media (max-width: 1200px) {
-    .header-upload-item .upload-placeholder p {
-        display: none;
-    }
-    
-    .header-upload-item .upload-placeholder i {
-        margin: 0;
-    }
-    
-    .header-upload-item {
-        max-width: 50px;
-        min-width: 40px;
-    }
-    
-    .header-upload-item .simple-drop-area {
-        min-height: 32px;
-    }
+/* Ensure buttons inside top-navbar-actions have consistent sizing */
+.top-navbar-actions .btn-icon {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
 }
 
+/* Responsive adjustments */
 @media (max-width: 992px) {
-    .header-uploads-container {
+    .page-subtitle {
         display: none;
+    }
+    
+    .header-uploads-container {
+        margin-right: 0;
+    }
+    
+    .header-divider {
+        display: none;
+    }
+    
+    .app-brand {
+        border-right: none;
+        padding-right: 8px;
+    }
+    
+    .top-navbar-actions {
+        border-left: none;
+        padding-left: 8px;
+    }
+}
+
+@media (max-width: 768px) {
+    .header-upload-item {
+        display: none;
+    }
+    
+    .top-navbar {
+        padding: 0 10px;
+    }
+    
+    .header-logo {
+        height: 32px;
+    }
+    
+    .page-title h1 {
+        font-size: 1rem;
     }
 }

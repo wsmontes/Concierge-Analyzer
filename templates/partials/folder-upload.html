@@ -3,28 +3,22 @@
   Provides streamlined interface for uploading restaurant data folders
   Dependencies: restaurant-visualizer.js for processing logic
 -->
-<div class="simple-drop-container mt-3">
-    <div class="simple-drop-area" id="folder-upload-area">
-        <input type="file" id="folder-input" class="file-input" webkitdirectory directory multiple>
+<div class="simple-drop-container">
+    <div class="simple-drop-area" data-tooltip="Upload Folder">
         <div class="upload-placeholder">
-            <i class="bi bi-folder-plus"></i>
-            <p class="micro-text">Drop restaurant data folder (optional)</p>
+            <i class="bi bi-folder"></i>
+            <span class="micro-text">Folder</span>
         </div>
-        <div class="selected-file d-none" id="folder-selected-file">
-            <i class="bi bi-folder-check"></i>
-            <p class="file-name micro-text text-truncate"></p>
-            <button type="button" class="btn btn-link btn-sm p-0 text-danger" id="folder-remove-file">
-                <i class="bi bi-x-circle"></i>
+        <input type="file" class="file-input" id="folder-files" webkitdirectory directory multiple>
+        <div class="selected-file" style="display: none;">
+            <i class="bi bi-check-circle-fill"></i>
+            <p class="file-name"></p>
+            <button class="btn btn-sm btn-icon remove-file">
+                <i class="bi bi-x"></i>
             </button>
         </div>
     </div>
-    <div id="folder-status" class="mt-2 d-none small">
-        <div class="progress" style="height: 5px;">
-            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-1">
-            <span class="badge bg-info" id="folder-status-text">Processing...</span>
-            <span id="folder-file-count" class="text-muted">0 files</span>
-        </div>
+    <div id="folder-status" class="d-none">
+        <!-- Status messages will appear here -->
     </div>
 </div>

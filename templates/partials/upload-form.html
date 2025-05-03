@@ -4,21 +4,22 @@
   Dependencies: ui-controls.js for file handling logic
 -->
 <div class="simple-drop-container">
-    <form id="upload-form" enctype="multipart/form-data" method="post">
-        <div class="simple-drop-area" id="upload-area">
-            <input type="file" id="chat-file" name="file" class="file-input" accept=".txt" required>
-            <div class="upload-placeholder">
-                <i class="bi bi-cloud-arrow-up"></i>
-                <p class="micro-text">Drop WhatsApp chat file here</p>
-            </div>
-            <div class="selected-file d-none" id="selected-file">
-                <i class="bi bi-file-text"></i>
-                <p class="file-name micro-text text-truncate"></p>
-                <button type="button" class="btn btn-link btn-sm p-0 text-danger" id="remove-file">
-                    <i class="bi bi-x-circle"></i>
-                </button>
-            </div>
+    <div class="simple-drop-area" data-tooltip="Upload Chat Data">
+        <div class="upload-placeholder">
+            <i class="bi bi-chat-dots"></i>
+            <span class="micro-text">Chat Data</span>
         </div>
+        <input type="file" class="file-input" id="whatsapp-file" accept=".txt">
+        <div class="selected-file" style="display: none;">
+            <i class="bi bi-check-circle-fill"></i>
+            <p class="file-name"></p>
+            <button class="btn btn-sm btn-icon remove-file">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+    </div>
+    <form id="upload-form" class="d-none">
+        <input type="file" name="file" id="hidden-file-input">
         <button type="submit" id="hidden-submit-btn" class="visually-hidden">Submit</button>
     </form>
 </div>
