@@ -956,6 +956,61 @@ body {
     margin-bottom: 5px;
 }
 
+/* Header Upload Forms Styling */
+.header-uploads-container {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.header-upload-item {
+    max-width: 200px;
+    min-width: 120px;
+}
+
+.header-upload-item .simple-drop-container {
+    padding: 0;
+    margin-bottom: 0;
+}
+
+.header-upload-item .simple-drop-area {
+    min-height: 40px;
+    padding: 5px;
+    border-width: 1px;
+}
+
+.header-upload-item .upload-placeholder i {
+    font-size: 1rem;
+    margin-bottom: 2px;
+}
+
+.header-upload-item .micro-text {
+    font-size: 0.65rem;
+    margin: 0;
+}
+
+.header-upload-item .selected-file {
+    padding: 3px;
+}
+
+.header-upload-item .selected-file i {
+    font-size: 0.8rem;
+}
+
+.header-upload-item #embeddings-status,
+.header-upload-item #folder-status {
+    display: none !important;
+}
+
+/* Responsive adjustments for header uploads */
+@media (max-width: 992px) {
+    .header-uploads-container {
+        display: none;
+    }
+}
+
 /* Responsive Layout */
 @media (max-width: 992px) {
     .sidebar {

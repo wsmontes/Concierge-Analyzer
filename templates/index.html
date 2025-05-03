@@ -16,8 +16,8 @@
     <link rel="stylesheet" href="/static/css/dashboard.css">
     <link rel="stylesheet" href="/static/css/conversations.css">
     <link rel="stylesheet" href="/static/css/debug-insights.css">
-    <script src="{{ url_for('static', filename='js/embeddings-parser.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/restaurant-visualizer.js') }}"></script>
+    <link rel="stylesheet" href="/static/css/header-uploads.css">
+    <!-- Scripts are moved to the bottom for better page loading performance -->
 </head>
 <body>
     <div class="app-container">
@@ -32,11 +32,6 @@
                     <i class="bi bi-x"></i>
                 </button>
             </div>
-            
-            <!-- Include the upload forms in the sidebar -->
-            {% include 'partials/upload-form.html' %}
-            {% include 'partials/embeddings-upload.html' %}
-            {% include 'partials/folder-upload.html' %}
             
             <ul class="sidebar-menu">
                 <li class="menu-header">ANALYTICS</li>
@@ -81,6 +76,19 @@
                 
                 <div class="page-title">
                     <h1 id="current-section-title">Dashboard</h1>
+                </div>
+                
+                <!-- Header Upload Forms Container -->
+                <div class="header-uploads-container d-flex gap-2 mx-2">
+                    <div class="header-upload-item">
+                        {% include 'partials/upload-form.html' %}
+                    </div>
+                    <div class="header-upload-item">
+                        {% include 'partials/embeddings-upload.html' %}
+                    </div>
+                    <div class="header-upload-item">
+                        {% include 'partials/folder-upload.html' %}
+                    </div>
                 </div>
                 
                 <div class="top-navbar-actions">
@@ -559,5 +567,7 @@
             });
         });
     </script>
+    <script src="{{ url_for('static', filename='js/embeddings-parser.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/restaurant-visualizer.js') }}"></script>
 </body>
 </html>

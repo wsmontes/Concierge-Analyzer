@@ -1,45 +1,101 @@
 /**
- * Restaurant Data Visualization Module for Concierge Analyzer
- * 
- * Provides visualization tools for restaurant categories and concepts
- * Handles loading and processing restaurant data from file uploads
- * 
- * Dependencies: d3.js, plotly.js, main.js
+ * Restaurant Visualizer Module
+ * Provides functionality for visualizing restaurant data through embedding analysis
+ * Dependencies: Plotly.js for visualization
  */
 
-// Global store for restaurant visualization data
+// Restaurant data object to store processed embeddings
 window.restaurantData = {
-    raw: null,         // Raw data
-    vectors: [],       // Extracted vectors
-    labels: [],        // Labels for each vector
-    categories: {},    // Category -> concepts mapping
-    loaded: false,     // Whether data has been loaded
-    currentVisualization: null // Current visualization state
+    raw: null,
+    vectors: [],
+    labels: [],
+    categories: {},
+    loaded: false,
+    currentVisualization: null
 };
 
-// Initialize restaurant data visualization module
-function initRestaurantVisualizer() {
+// Wait for the document to be fully loaded before initializing
+document.addEventListener('DOMContentLoaded', function() {
     console.log('Initializing Restaurant Visualizer module');
-    initFolderUpload();
-    initVisualizationTabs();
+    
+    // First wait for DOM content to be loaded
+    // Then wait for an additional short delay to ensure all elements are rendered
+    setTimeout(safeInit, 500);
+});
+
+// Safe initialization with multiple fallbacks
+function safeInit() {
+    // Explicitly initialize visualizations first (doesn't depend on uploads)
+    initRestaurantVisualization();
+    
+    // Query with multiple selector strategies for better element finding
+    tryInitFolderUpload();
 }
 
-// Initialize folder upload functionality
-function initFolderUpload() {
-    const uploadArea = document.getElementById('folder-upload-area');
-    const folderInput = document.getElementById('folder-input');
+// Try multiple strategies to find upload elements
+function tryInitFolderUpload() {
+    // Strategy 1: Direct ID lookup - most common approach
+    let uploadArea = document.getElementById('folder-upload-area');
+    let folderInput = document.getElementById('folder-input');
+    
+    // If direct lookup fails, try query selector for more specific matching
+    if (!uploadArea || !folderInput) {
+        console.log('First attempt to find upload elements failed, trying alternative selectors...');
+        uploadArea = document.querySelector('.header-upload-item #folder-upload-area') || 
+                     document.querySelector('.simple-drop-area#folder-upload-area');
+                     
+        folderInput = document.querySelector('.header-upload-item #folder-input') ||
+                       document.querySelector('input#folder-input');
+    }
+    
+    // If we still don't have both elements, try one final approach with a delay
+    if (!uploadArea || !folderInput) {
+        console.warn('Folder upload elements not found, will retry with broader selectors in 1 second');
+        setTimeout(() => {
+            // Final attempt with very broad selectors
+            uploadArea = document.querySelector('[id="folder-upload-area"]');
+            folderInput = document.querySelector('[id="folder-input"]');
+            
+            // Last resort - log what elements actually exist
+            if (!uploadArea || !folderInput) {
+                console.error('Folder upload elements still not found after retry attempts');
+                logAvailableElements();
+                return;
+            }
+            
+            console.log('Found folder upload elements on final retry');
+            setupFolderUploadHandlers(uploadArea, folderInput);
+        }, 1000);
+        return;
+    }
+    
+    console.log('Found folder upload elements');
+    setupFolderUploadHandlers(uploadArea, folderInput);
+}
+
+// Log available elements for debugging
+function logAvailableElements() {
+    const allElements = document.querySelectorAll('*[id]');
+    console.log('Available elements with IDs:', Array.from(allElements).map(el => el.id));
+    
+    // Check if we at least have the container
+    const headerContainer = document.querySelector('.header-uploads-container');
+    if (headerContainer) {
+        console.log('Header uploads container exists, but specific elements not found');
+    } else {
+        console.log('Header uploads container not found');
+    }
+}
+
+// Set up event handlers for folder upload
+function setupFolderUploadHandlers(uploadArea, folderInput) {
     const selectedFileEl = document.getElementById('folder-selected-file');
-    const uploadPlaceholder = uploadArea ? uploadArea.querySelector('.upload-placeholder') : null;
+    const uploadPlaceholder = uploadArea.querySelector('.upload-placeholder');
     const fileNameEl = selectedFileEl ? selectedFileEl.querySelector('.file-name') : null;
     const removeButton = document.getElementById('folder-remove-file');
     const statusElement = document.getElementById('folder-status');
-    const statusText = document.getElementById('folder-status-text');
+    const statusText = statusElement ? statusElement.querySelector('#folder-status-text') : null;
     const fileCountEl = document.getElementById('folder-file-count');
-
-    if (!uploadArea || !folderInput) {
-        console.warn('Folder upload elements not found');
-        return;
-    }
 
     // Handle file selection with validation
     folderInput.addEventListener('change', function() {
@@ -152,7 +208,7 @@ function initFolderUpload() {
         selectedFileEl.classList.remove('d-none');
         uploadPlaceholder.classList.add('d-none');
         
-        // Show status
+        // Show status if it exists
         if (statusElement) {
             statusElement.classList.remove('d-none');
             statusText.textContent = 'Ready to process';
@@ -289,6 +345,13 @@ function initFolderUpload() {
             console.log(message);
         }
     }
+}
+
+// Initialize restaurant visualization components
+function initRestaurantVisualization() {
+    console.log('Setting up restaurant visualization components');
+    // Implementation for visualization setup
+    // ...
 }
 
 // Initialize visualization tabs
@@ -650,8 +713,3 @@ function renderClusteringVisualization() {
     
     vizContainer.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="alert alert-info">Clustering visualization will be implemented in a future update</div></div>';
 }
-
-// Initialize the module when the document is ready
-document.addEventListener('DOMContentLoaded', function() {
-    initRestaurantVisualizer();
-});

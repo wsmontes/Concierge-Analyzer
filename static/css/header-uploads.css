@@ -1,0 +1,94 @@
+/**
+ * Header Upload Components Styling
+ * Provides styling for upload forms relocated to the top navigation bar
+ * Dependencies: main.css for base upload styling
+ */
+
+/* Header Upload Forms Container */
+.header-uploads-container {
+    display: flex;
+    flex-grow: 1;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin: 0 15px;
+}
+
+/* Individual Header Upload Item */
+.header-upload-item {
+    max-width: 220px;
+    min-width: 150px;
+    flex: 1;
+}
+
+/* Remove margin from upload containers inside header */
+.header-upload-item .simple-drop-container {
+    padding: 0;
+    margin: 0;
+}
+
+/* Make header upload areas smaller */
+.header-upload-item .simple-drop-area {
+    min-height: 40px;
+    padding: 6px;
+    border-width: 1px;
+}
+
+/* Adjust icon size in header uploads */
+.header-upload-item .upload-placeholder i {
+    font-size: 0.9rem;
+    margin-bottom: 2px;
+}
+
+/* Smaller text for header uploads */
+.header-upload-item .upload-placeholder .micro-text {
+    font-size: 0.7rem;
+    margin: 0;
+    white-space: nowrap;
+}
+
+/* Adjust selected file display */
+.header-upload-item .selected-file {
+    padding: 4px;
+}
+
+.header-upload-item .selected-file i {
+    font-size: 0.8rem;
+}
+
+.header-upload-item .selected-file .file-name {
+    font-size: 0.7rem;
+    max-width: 120px;
+}
+
+/* Hide status elements in header to save space */
+.header-upload-item #embeddings-status,
+.header-upload-item #folder-status {
+    display: none !important;
+}
+
+/* Responsive adjustments for header uploads */
+@media (max-width: 1200px) {
+    .header-upload-item .upload-placeholder p {
+        display: none;
+    }
+    
+    .header-upload-item .upload-placeholder i {
+        margin: 0;
+    }
+    
+    .header-upload-item {
+        max-width: 50px;
+        min-width: 40px;
+    }
+    
+    .header-upload-item .simple-drop-area {
+        min-height: 32px;
+    }
+}
+
+@media (max-width: 992px) {
+    .header-uploads-container {
+        display: none;
+    }
+}

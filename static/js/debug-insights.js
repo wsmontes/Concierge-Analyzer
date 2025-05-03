@@ -656,7 +656,7 @@ if (typeof window.DebugInsightsModule === 'undefined') {
             }
             
             // Display concept-restaurant associations
-            const hasTableData = displayConceptRestaurantAssociations(crossInsights);
+            const hasTableData = displayConceptRestaurantAssociations(crossInsights.concept_restaurant_associations);
             
             // If we're using the new UI, we can skip the old accordion display
             const hasAccordionData = accordionView ? displayCategoryRestaurantAccordion(crossInsights) : false;
@@ -978,58 +978,154 @@ if (typeof window.DebugInsightsModule === 'undefined') {
         detailsPanel.innerHTML = detailsHtml;
     }
 
-    // Display concept-restaurant associations table with element check
-    function displayConceptRestaurantAssociations(crossInsights) {
-        if (!crossInsights) return false;
+    /**
+     * Displays concept-restaurant associations in a table
+     * @param {Array} associations - Array of associations between concepts and restaurants
+     * @returns {boolean} True if associations were successfully displayed
+     */
+    function displayConceptRestaurantAssociations(associations) {
+        // First try to find the table body element
+        const tableBody = document.getElementById('relationship-table-body');
         
-        // Updated to look for both old and new table selectors for backwards compatibility
-        const tableBody = document.querySelector('#relationship-table tbody') || 
-                         document.querySelector('#concept-restaurant-table tbody');
-                         
+        // If table body doesn't exist, try to find a container to add it to
         if (!tableBody) {
-            console.warn("Relationship table body element not found");
+            console.warn('Relationship table body element not found, creating dynamically');
+            
+            // Try multiple possible container selectors
+            const containerSelectors = [
+                '.debug-insights-container',
+                '#debug-insights-section',
+                '.content-section',
+                '.card-body'
+            ];
+            
+            let parentContainer = null;
+            
+            // Try each selector until a container is found
+            for (const selector of containerSelectors) {
+                const container = document.querySelector(selector);
+                if (container) {
+                    parentContainer = container;
+                    console.log(`Found container using selector: ${selector}`);
+                    break;
+                }
+            }
+            
+            if (!parentContainer) {
+                console.error('Debug insights container not found - cannot create relationship table');
+                return false;
+            }
+            
+            // Create the relationship table dynamically
+            const tableCard = document.createElement('div');
+            tableCard.className = 'card shadow-sm mb-3';
+            tableCard.innerHTML = `
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-diagram-3 me-2"></i>
+                        Concept-Restaurant Relationships
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Concept</th>
+                                    <th>Restaurant</th>
+                                    <th>Strength</th>
+                                </tr>
+                            </thead>
+                            <tbody id="relationship-table-body">
+                                <!-- Relationships will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            // Add the table to the page
+            parentContainer.appendChild(tableCard);
+            
+            // Now get the table body reference
+            const newTableBody = document.getElementById('relationship-table-body');
+            if (!newTableBody) {
+                console.error('Failed to create relationship table');
+                return false;
+            }
+            
+            return populateRelationshipTable(newTableBody, associations);
+        } else {
+            return populateRelationshipTable(tableBody, associations);
+        }
+    }
+
+    /**
+     * Populates the relationship table with data
+     * @param {HTMLElement} tableBody - Table body element to populate
+     * @param {Array} associations - Association data to display
+     * @returns {boolean} True if table was populated successfully
+     */
+    function populateRelationshipTable(tableBody, associations) {
+        // Clear existing content
+        tableBody.innerHTML = '';
+        
+        if (!associations || associations.length === 0) {
+            const emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = '<td colspan="4" class="text-center">No relationship data available</td>';
+            tableBody.appendChild(emptyRow);
+            console.log('No relationship data available to display');
             return false;
         }
         
-        tableBody.innerHTML = '';
-        
-        // Check for concept-restaurant associations in the data
-        const associations = crossInsights.concept_restaurant_associations || [];
-        
-        if (Array.isArray(associations) && associations.length > 0) {
-            console.log(`Displaying ${associations.length} concept-restaurant associations`);
+        // Add each association as a row
+        associations.forEach(assoc => {
+            const row = document.createElement('tr');
             
-            associations.forEach(association => {
-                const row = document.createElement('tr');
-                
-                const categoryCell = document.createElement('td');
-                categoryCell.textContent = association.category || "Unknown Category";
-                row.appendChild(categoryCell);
-                
-                const conceptCell = document.createElement('td');
-                conceptCell.textContent = association.concept || "Unknown Concept";
-                row.appendChild(conceptCell);
-                
-                const restaurantCell = document.createElement('td');
-                restaurantCell.textContent = association.restaurant || "Unknown Restaurant";
-                row.appendChild(restaurantCell);
-                
-                const countCell = document.createElement('td');
-                countCell.textContent = association.count || 0;
-                row.appendChild(countCell);
-                
-                // Add confidence cell if the table has 5 columns
-                if (tableBody.parentElement.querySelectorAll('th').length > 4) {
-                    const confidenceCell = document.createElement('td');
-                    confidenceCell.textContent = association.confidence?.toFixed(2) || "N/A";
-                    row.appendChild(confidenceCell);
-                }
-                
-                tableBody.appendChild(row);
-            });
-            return true;
-        }
-        return false;
+            // Create cells with proper structure and error handling
+            const categoryCell = document.createElement('td');
+            categoryCell.textContent = assoc.category || 'Unknown';
+            
+            const conceptCell = document.createElement('td');
+            conceptCell.textContent = assoc.concept || 'Unknown';
+            
+            const restaurantCell = document.createElement('td');
+            restaurantCell.textContent = assoc.restaurant || 'Unknown';
+            
+            const strengthCell = document.createElement('td');
+            
+            // Display strength as a progress bar
+            if (typeof assoc.strength === 'number') {
+                const percentage = Math.round(assoc.strength * 100);
+                strengthCell.innerHTML = `
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar" role="progressbar" 
+                            style="width: ${percentage}%;" 
+                            aria-valuenow="${percentage}" 
+                            aria-valuemin="0" 
+                            aria-valuemax="100"
+                            title="${percentage}%">
+                        </div>
+                    </div>
+                    <span class="small">${percentage}%</span>
+                `;
+            } else {
+                strengthCell.textContent = 'N/A';
+            }
+            
+            // Add all cells to the row
+            row.appendChild(categoryCell);
+            row.appendChild(conceptCell);
+            row.appendChild(restaurantCell);
+            row.appendChild(strengthCell);
+            
+            // Add the row to the table
+            tableBody.appendChild(row);
+        });
+        
+        console.log(`Successfully displayed ${associations.length} category-restaurant associations`);
+        return true;
     }
 
     // Display category-restaurant accordion with element check
