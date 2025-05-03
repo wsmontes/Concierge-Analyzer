@@ -14,6 +14,9 @@ from collections import defaultdict
 import logging
 import traceback
 from flask_cors import CORS
+
+CORS(app)
+
 from dotenv import load_dotenv
 import os
 import io
