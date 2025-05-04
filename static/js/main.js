@@ -154,6 +154,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Process the data and display results
     function processData(data) {
+        // Hide no-data background
+        const noDataBackground = document.getElementById('no-data-background');
+        if (noDataBackground) {
+            noDataBackground.style.display = 'none';
+        }
+        
         // Show results container
         resultsContainer.classList.remove('d-none');
         
