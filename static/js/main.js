@@ -62,46 +62,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Show loading state in favicon
-    function showLoadingFavicon() {
-        // Save the original favicon
-        const originalFavicon = document.querySelector('link[rel="icon"]');
-        
-        if (!originalFavicon) return;
-        
-        // Create and store original favicon href if not already stored
-        if (!window.originalFaviconHref) {
-            window.originalFaviconHref = originalFavicon.href;
-        }
-        
-        // Create a link for the animated favicon
-        const animatedLink = document.createElement('link');
-        animatedLink.rel = 'icon';
-        animatedLink.type = 'image/gif';
-        animatedLink.href = '/static/images/Lotier_Logo.gif';
-        
-        // Remove original favicon and add animated one
-        originalFavicon.remove();
-        document.head.appendChild(animatedLink);
-    }
-
-    // Restore original favicon
-    function restoreOriginalFavicon() {
-        if (!window.originalFaviconHref) return;
-        
-        const animatedFavicon = document.querySelector('link[rel="icon"]');
-        if (animatedFavicon) {
-            animatedFavicon.remove();
-        }
-        
-        // Create and add back the original favicon link
-        const originalLink = document.createElement('link');
-        originalLink.rel = 'icon';
-        originalLink.type = 'image/png';
-        originalLink.href = window.originalFaviconHref;
-        document.head.appendChild(originalLink);
-    }
-
     // Form submission handler
     function handleFormSubmit(event) {
         event.preventDefault();
@@ -135,10 +95,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData();
         formData.append('file', chatFile);
         
-        // Show loading indicator and update favicon
+        // Show loading indicator
         loadingIndicator.classList.remove('d-none');
         resultsContainer.classList.add('d-none');
-        showLoadingFavicon();
         
         // Upload file with improved error handling
         fetch(`${CONFIG.API_URL}/upload`, {
@@ -189,9 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
             showNotification(`Error uploading file: ${error.message}`, 'error');
         })
         .finally(() => {
-            // Hide loading indicator and restore favicon
             loadingIndicator.classList.add('d-none');
-            restoreOriginalFavicon();
         });
     }
     

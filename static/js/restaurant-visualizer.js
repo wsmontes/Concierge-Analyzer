@@ -1090,19 +1090,7 @@ function renderSunburstChart(data, container, colorScheme) {
         ids: ids,
         branchvalues: 'total',
         hovertemplate: '<b>%{label}</b><br>Count: %{value}<br>Percentage: %{percentEntry:.1%}<extra></extra>',
-        // Remove radial text orientation which causes vertical text
-        insidetextorientation: 'horizontal',
-        // Control text display - only show text for larger segments
-        textinfo: 'label',
-        insidetextfont: {
-            size: 10
-        },
-        outsidetextfont: {
-            size: 12,
-            color: "#333"
-        },
-        // Enable legend mapping
-        showlegend: true,
+        insidetextorientation: 'radial',
         marker: { 
             colorscale: colorScheme,
             line: { width: 0.5, color: '#fff' } // Add thin white borders for better separation
@@ -1110,25 +1098,10 @@ function renderSunburstChart(data, container, colorScheme) {
     };
     
     const layout = {
-        margin: { l: 10, r: 120, b: 10, t: 10 }, // Adjusted margins to make room for legend
+        margin: { l: 0, r: 0, b: 0, t: 0 },
         sunburstcolorway: getColorScheme(colorScheme, data.children.length),
         font: { size: 10 },
-        hoverlabel: { font: { size: 12 } },
-        // Add legend configuration
-        showlegend: true,
-        legend: {
-            orientation: 'v',
-            x: 1.05,
-            y: 0.5,
-            xanchor: 'left',
-            yanchor: 'middle',
-            bordercolor: '#E2E2E2',
-            borderwidth: 1,
-            bgcolor: '#FFFFFF',
-            font: {
-                size: 10
-            }
-        }
+        hoverlabel: { font: { size: 12 } }
     };
     
     const config = {
@@ -1329,36 +1302,33 @@ function addExportButton(container, buttonId, titlePrefix) {
         // Get current visualization type
         const vizType = window.restaurantData.currentVisualization || 'visualization';
         
-        // Add branding to the visualization before export
-        const brandingElement = document.createElement('div');
-        brandingElement.style.position = 'absolute';
-        brandingElement.style.bottom = '10px';
-        brandingElement.style.right = '10px';
-        brandingElement.style.opacity = '0.7';
-        brandingElement.innerHTML = '<img src="/static/images/Lotier_Logo.webp" height="25" alt="Lotier">';
-        container.appendChild(brandingElement);
+        // Generate filename
+        const filename = `${titlePrefix.toLowerCase().replace(/\s+/g, '-')}-${vizType}-${dateString}`;
         
-        // Export functionality using html2canvas
-        html2canvas(container).then(canvas => {
-            // Remove branding element after capture
-            container.removeChild(brandingElement);
-            
-            // Convert to image and trigger download
-            const image = canvas.toDataURL('image/png');
+        // Use Plotly's toImage function to download the visualization
+        Plotly.toImage(container, {
+            format: 'png',
+            height: 800,
+            width: 800,
+            scale: 2,
+            filename: filename
+        }).then(function(dataUrl) {
+            // Create a download link
             const link = document.createElement('a');
-            link.href = image;
-            link.download = `${titlePrefix || 'Lotier'}-${vizType}-${dateString}.png`;
+            link.href = dataUrl;
+            link.download = `${filename}.png`;
             link.click();
-        }).catch(error => {
+        }).catch(function(error) {
             console.error('Error exporting visualization:', error);
-            // Remove branding element if export fails
-            if (container.contains(brandingElement)) {
-                container.removeChild(brandingElement);
-            }
+            alert('Failed to export visualization. Please try again.');
         });
     });
     
+    // Add button to container
     exportButtonContainer.appendChild(exportButton);
+    
+    // Add container to visualization container
+    container.style.position = 'relative'; // Ensure container is positioned
     container.appendChild(exportButtonContainer);
 }
 

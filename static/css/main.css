@@ -1275,25 +1275,4 @@ body {
     height: 90px; /* Increased from 30px */
     margin-bottom: 0px;
     max-width: 90%; /* Ensure it fits well in the sidebar */
-    transition: transform 0.3s ease;
-}
-
-.sidebar .lotier-logo:hover {
-    transform: scale(1.05);
-}
-
-/* Add favicon animation for loading states */
-.favicon-spinner {
-    animation: favicon-spin 2s linear infinite;
-    height: 24px;
-    width: 24px;
-}
-
-@keyframes favicon-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
 }
