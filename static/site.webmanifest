@@ -1,0 +1,32 @@
+{
+    "name": "Concierge Chat Analyzer",
+    "short_name": "Concierge",
+    "description": "Analytics and insights for Concierge Chat conversations",
+    "icons": [
+        {
+            "src": "/static/images/icon16.png",
+            "sizes": "16x16",
+            "type": "image/png"
+        },
+        {
+            "src": "/static/images/icon48.png",
+            "sizes": "48x48",
+            "type": "image/png"
+        },
+        {
+            "src": "/static/images/icon128.png",
+            "sizes": "128x128",
+            "type": "image/png"
+        },
+        {
+            "src": "/static/images/icon512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "theme_color": "#3A7FF6",
+    "background_color": "#ffffff",
+    "display": "standalone",
+    "start_url": "/",
+    "orientation": "any"
+}
