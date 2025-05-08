@@ -4,8 +4,14 @@
  */
 
 const CONFIG = {
-    // Server configuration
-    API_URL: 'http://localhost:5000',
+    // Server configuration - dynamically determine API URL based on current host
+    API_URL: (function() {
+        // If we're on deployed environment, use relative URL to current host
+        // Otherwise use localhost for development
+        const isLocalhost = window.location.hostname === "localhost" || 
+                           window.location.hostname === "127.0.0.1";
+        return isLocalhost ? 'http://localhost:5000' : '';
+    })(),
     
     // Chart colors and styling
     CHART_COLORS: {

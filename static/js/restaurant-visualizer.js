@@ -36,7 +36,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Fetch sheet restaurant data from API with enhanced handling for consistent Excel files
 function fetchSheetRestaurants() {
-    return fetch('/sheet_restaurants')
+    return fetch('/sheet_restaurants', {
+        // Add timeout to prevent long waiting on server issues
+        signal: AbortSignal.timeout(5000)
+    })
         .then(response => {
             if (!response.ok) {
                 throw new Error('Failed to fetch sheet restaurant data');
@@ -64,11 +67,36 @@ function fetchSheetRestaurants() {
             return data;
         })
         .catch(error => {
-            // More graceful error handling - log but don't alert
-            console.error('Error fetching sheet restaurant data:', error);
+            // Enhanced error handling with specific messages for connection issues
+            if (error.name === 'TypeError' || error.name === 'AbortError') {
+                console.error('Server connection issue when fetching sheet restaurant data:', error);
+                showServerConnectionError('Failed to fetch restaurant data from server. The server may not be running.');
+            } else {
+                // More graceful error handling - log but don't alert
+                console.error('Error fetching sheet restaurant data:', error);
+            }
             window.restaurantData.sheetRestaurants = [];
             return [];
         });
+}
+
+// Helper function to show server connection error
+function showServerConnectionError(message) {
+    // Use notification system if available
+    if (typeof showNotification === 'function') {
+        showNotification(message, 'error');
+    } else {
+        console.error(message);
+    }
+    
+    // Update server status indicator if it exists
+    const serverIndicator = document.getElementById('server-status-indicator');
+    if (serverIndicator) {
+        serverIndicator.classList.remove('unknown', 'available');
+        serverIndicator.classList.add('unavailable');
+        serverIndicator.title = 'Server status: Not responding';
+        serverIndicator.innerHTML = '<i class="bi bi-exclamation-circle"></i>';
+    }
 }
 
 // Add a public method to refresh sheet restaurants after Excel file upload

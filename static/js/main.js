@@ -21,6 +21,9 @@ document.addEventListener('DOMContentLoaded', function() {
         charts: {}
     };
     
+    // Server status tracking
+    let serverAvailable = null; // null = unknown, true = available, false = unavailable
+    
     // Initialize event listeners
     function initEventListeners() {
         // Form submission handler
@@ -60,6 +63,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.location.hash = this.id;
             });
         });
+
+        // Check server connectivity on page load
+        checkServerConnectivity();
+        
+        // Add server status indicator to navbar if it doesn't exist
+        createServerStatusIndicator();
     }
     
     // Form submission handler
@@ -91,64 +100,87 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log(`Uploading file: ${chatFile.name}, size: ${chatFile.size} bytes`);
         
-        // Create FormData object and explicitly append the file
-        const formData = new FormData();
-        formData.append('file', chatFile);
-        
-        // Show loading indicator
-        loadingIndicator.classList.remove('d-none');
-        resultsContainer.classList.add('d-none');
-        
-        // Upload file with improved error handling
-        fetch(`${CONFIG.API_URL}/upload`, {
-            method: 'POST',
-            body: formData,
-            // Don't set Content-Type header manually, let browser set it with boundary
-        })
-        .then(response => {
-            console.log('Response status:', response.status);
-            
-            if (!response.ok) {
-                return response.json().then(errorData => {
-                    throw new Error(`Server error: ${errorData.error || response.statusText}`);
-                }).catch(err => {
-                    // If JSON parsing fails, throw generic error with status
-                    if (err.name === 'SyntaxError') {
-                        throw new Error(`Server error (${response.status}): ${response.statusText}`);
-                    }
-                    throw err;
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Upload response:', data);
-            
-            // Store the data globally for later use
-            window.appData.lastUploadedData = data;
-            
-            // Check if we have valid conversation data
-            if (!data.metrics || !Array.isArray(data.metrics) || data.metrics.length === 0) {
-                throw new Error('No conversation data found in the response');
+        // Check server connectivity before attempting upload
+        checkServerConnectivity().then(available => {
+            if (!available) {
+                showNotification('Server is not available. Please check if the application backend is running.', 'error');
+                updateServerStatusIndicator(false);
+                return;
             }
             
-            console.log(`Received ${data.metrics.length} conversations and ${data.recommendations ? data.recommendations.length : 0} recommendations`);
+            // Create FormData object and explicitly append the file
+            const formData = new FormData();
+            formData.append('file', chatFile);
             
-            // Process and display the data
-            processData(data);
+            // Show loading indicator
+            loadingIndicator.classList.remove('d-none');
+            resultsContainer.classList.add('d-none');
             
-            // Show export PDF button
-            exportPdfBtn.classList.remove('d-none');
-            
-            // Show success notification
-            showNotification('Data loaded successfully!', 'success');
-        })
-        .catch(error => {
-            console.error('Error uploading file:', error);
-            showNotification(`Error uploading file: ${error.message}`, 'error');
-        })
-        .finally(() => {
-            loadingIndicator.classList.add('d-none');
+            // Upload file with improved error handling
+            fetch(`${CONFIG.API_URL}/upload`, {
+                method: 'POST',
+                body: formData,
+                // Don't set Content-Type header manually, let browser set it with boundary
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(`Server error: ${errorData.error || response.statusText}`);
+                    }).catch(err => {
+                        // If JSON parsing fails, throw generic error with status
+                        if (err.name === 'SyntaxError') {
+                            throw new Error(`Server error (${response.status}): ${response.statusText}`);
+                        }
+                        throw err;
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Upload response:', data);
+                
+                // Store the data globally for later use
+                window.appData.lastUploadedData = data;
+                
+                // Check if we have valid conversation data
+                if (!data.metrics || !Array.isArray(data.metrics) || data.metrics.length === 0) {
+                    throw new Error('No conversation data found in the response');
+                }
+                
+                console.log(`Received ${data.metrics.length} conversations and ${data.recommendations ? data.recommendations.length : 0} recommendations`);
+                
+                // Process and display the data
+                processData(data);
+                
+                // Show export PDF button
+                exportPdfBtn.classList.remove('d-none');
+                
+                // Show success notification
+                showNotification('Data loaded successfully!', 'success');
+                
+                // Update server status indicator
+                updateServerStatusIndicator(true);
+            })
+            .catch(error => {
+                console.error('Error uploading file:', error);
+                
+                // Handle connection errors specifically
+                if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                    showNotification('Unable to connect to the server. Please check if the application backend is running at ' + 
+                        CONFIG.API_URL + ' and try again.', 'error');
+                    updateServerStatusIndicator(false);
+                    
+                    // Show server connection troubleshooting guide
+                    showServerTroubleshootingGuide();
+                } else {
+                    showNotification(`Error uploading file: ${error.message}`, 'error');
+                }
+            })
+            .finally(() => {
+                loadingIndicator.classList.add('d-none');
+            });
         });
     }
     
@@ -503,6 +535,192 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             console.warn('embeddings-parser.js script not loaded');
         }
+    }
+    
+    /**
+     * Check if the server is available
+     * @returns {Promise<boolean>} Promise that resolves to true if server is available, false otherwise
+     */
+    function checkServerConnectivity() {
+        return fetch(`${CONFIG.API_URL}/status`, { 
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            mode: 'cors',
+            // Request times out after 3 seconds
+            signal: AbortSignal.timeout(3000)
+        })
+        .then(response => {
+            serverAvailable = response.ok;
+            updateServerStatusIndicator(serverAvailable);
+            return serverAvailable;
+        })
+        .catch(error => {
+            console.warn('Server connectivity check failed:', error);
+            serverAvailable = false;
+            updateServerStatusIndicator(false);
+            return false;
+        });
+    }
+    
+    /**
+     * Create server status indicator in the navbar
+     */
+    function createServerStatusIndicator() {
+        // Check if it already exists
+        if (document.getElementById('server-status-indicator')) return;
+        
+        const navbarActions = document.querySelector('.top-navbar-actions');
+        if (!navbarActions) return;
+        
+        const indicator = document.createElement('div');
+        indicator.id = 'server-status-indicator';
+        indicator.className = 'server-status unknown';
+        indicator.title = 'Server status: Checking...';
+        indicator.innerHTML = '<i class="bi bi-question-circle"></i>';
+        
+        // Add tooltip functionality if bootstrap is available
+        if (typeof bootstrap !== 'undefined') {
+            new bootstrap.Tooltip(indicator);
+        }
+        
+        // Add click handler to manually check connectivity
+        indicator.addEventListener('click', function() {
+            checkServerConnectivity().then(available => {
+                if (available) {
+                    showNotification('Server is running properly', 'success');
+                } else {
+                    showNotification('Server is not responding. Please check if the backend is running.', 'error');
+                    showServerTroubleshootingGuide();
+                }
+            });
+        });
+        
+        // Insert at the beginning of the navbar actions
+        navbarActions.insertBefore(indicator, navbarActions.firstChild);
+        
+        // Add styles if they don't exist
+        if (!document.getElementById('server-status-styles')) {
+            const styleEl = document.createElement('style');
+            styleEl.id = 'server-status-styles';
+            styleEl.textContent = `
+                .server-status {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 50%;
+                    margin-right: 8px;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                }
+                .server-status.unknown { background-color: #6c757d; color: white; }
+                .server-status.available { background-color: #198754; color: white; }
+                .server-status.unavailable { background-color: #dc3545; color: white; }
+                .server-status i { font-size: 14px; }
+                
+                .troubleshooting-guide {
+                    max-width: 600px;
+                    margin: 20px auto;
+                    padding: 20px;
+                    border-radius: 8px;
+                    background-color: #f8f9fa;
+                    border: 1px solid #dee2e6;
+                }
+                .troubleshooting-guide h4 {
+                    margin-top: 0;
+                    color: #dc3545;
+                }
+                .troubleshooting-guide ol {
+                    padding-left: 20px;
+                }
+                .troubleshooting-guide code {
+                    background-color: #e9ecef;
+                    padding: 2px 4px;
+                    border-radius: 4px;
+                }
+            `;
+            document.head.appendChild(styleEl);
+        }
+    }
+    
+    /**
+     * Update the server status indicator
+     * @param {boolean} available - Whether the server is available
+     */
+    function updateServerStatusIndicator(available) {
+        const indicator = document.getElementById('server-status-indicator');
+        if (!indicator) return;
+        
+        // Remove all status classes
+        indicator.classList.remove('unknown', 'available', 'unavailable');
+        
+        if (available === null) {
+            indicator.classList.add('unknown');
+            indicator.title = 'Server status: Unknown';
+            indicator.innerHTML = '<i class="bi bi-question-circle"></i>';
+        } else if (available) {
+            indicator.classList.add('available');
+            indicator.title = 'Server status: Running';
+            indicator.innerHTML = '<i class="bi bi-check-circle"></i>';
+        } else {
+            indicator.classList.add('unavailable');
+            indicator.title = 'Server status: Not responding';
+            indicator.innerHTML = '<i class="bi bi-exclamation-circle"></i>';
+        }
+        
+        // Update tooltip if bootstrap is available
+        if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+            const tooltip = bootstrap.Tooltip.getInstance(indicator);
+            if (tooltip) {
+                tooltip.dispose();
+            }
+            new bootstrap.Tooltip(indicator);
+        }
+    }
+    
+    /**
+     * Show a troubleshooting guide for server connection issues
+     */
+    function showServerTroubleshootingGuide() {
+        // Check if the guide already exists
+        if (document.getElementById('server-troubleshooting-guide')) return;
+        
+        const resultsContainer = document.getElementById('results-container');
+        if (!resultsContainer) return;
+        
+        const guide = document.createElement('div');
+        guide.id = 'server-troubleshooting-guide';
+        guide.className = 'troubleshooting-guide';
+        guide.innerHTML = `
+            <h4><i class="bi bi-exclamation-triangle-fill me-2"></i>Server Connection Issue</h4>
+            <p>The application cannot connect to the backend server. Here are some troubleshooting steps:</p>
+            <ol>
+                <li>Check if the server is running on <code>${CONFIG.API_URL}</code></li>
+                <li>Make sure you've started the Python backend with <code>python app.py</code> or <code>flask run</code></li>
+                <li>Verify that your firewall isn't blocking the connection</li>
+                <li>Check the server console for any error messages</li>
+                <li>Try restarting the server application</li>
+            </ol>
+            <p>After fixing the issue, click the server status indicator in the navbar to check connectivity.</p>
+            <button id="dismiss-guide" class="btn btn-sm btn-outline-secondary mt-2">Dismiss</button>
+        `;
+        
+        // Insert before content sections
+        const firstSection = resultsContainer.querySelector('.content-section');
+        if (firstSection) {
+            resultsContainer.insertBefore(guide, firstSection);
+        } else {
+            resultsContainer.appendChild(guide);
+        }
+        
+        // Show the results container if hidden
+        resultsContainer.classList.remove('d-none');
+        
+        // Add dismiss button functionality
+        document.getElementById('dismiss-guide').addEventListener('click', function() {
+            guide.remove();
+        });
     }
 });
 

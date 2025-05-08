@@ -28,7 +28,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Fetch sheet restaurant data from API with retry mechanism for consistent Excel files
 function fetchSheetRestaurants() {
-    return fetch('/sheet_restaurants')
+    return fetch('/sheet_restaurants', {
+        // Add timeout to prevent long waiting on server issues
+        signal: AbortSignal.timeout(5000)
+    })
         .then(response => {
             if (!response.ok) {
                 throw new Error('Failed to fetch sheet restaurant data');
@@ -50,7 +53,28 @@ function fetchSheetRestaurants() {
             return data;
         })
         .catch(error => {
-            console.error('Error fetching sheet restaurant data:', error);
+            // Enhanced error handling with specific messages for connection issues
+            if (error.name === 'TypeError' || error.name === 'AbortError') {
+                console.error('Server connection issue when fetching sheet restaurant data:', error);
+                showNotification('Unable to fetch restaurant data from server. The server may not be running.', 'error');
+                
+                // Fall back to an offline mode warning
+                const emptyState = document.getElementById('restaurant-empty-state');
+                if (emptyState) {
+                    // Add a server connection warning to the empty state
+                    const warning = document.createElement('div');
+                    warning.className = 'alert alert-warning mt-3';
+                    warning.innerHTML = `
+                        <h5><i class="bi bi-exclamation-triangle-fill me-2"></i>Server Connection Issue</h5>
+                        <p>Could not connect to the server to fetch restaurant data. 
+                        Please check if the application backend is running.</p>
+                    `;
+                    emptyState.appendChild(warning);
+                }
+            } else {
+                console.error('Error fetching sheet restaurant data:', error);
+            }
+            
             // Initialize with empty array in case of error
             restaurantDetailState.sheetRestaurants = [];
             return [];
