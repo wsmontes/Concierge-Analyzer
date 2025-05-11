@@ -14,6 +14,7 @@ import logging
 from dotenv import load_dotenv
 import psycopg2
 import traceback
+from flask_cors import CORS
 
 # Load environment variables
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -28,6 +29,9 @@ dev_app = Flask(__name__, static_folder="static", template_folder="templates")
 logging.basicConfig(level=logging.INFO,
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Update the CORS configuration to specifically target API routes
+CORS(dev_app, resources={r"/api/*": {"origins": "*"}})
 
 # Check if we're running this file directly
 if __name__ == "__main__":
