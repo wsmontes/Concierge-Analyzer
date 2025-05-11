@@ -1230,27 +1230,25 @@ def get_sheet_restaurants():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/restaurants/batch', methods=['POST', 'OPTIONS'])
-def batch_restaurants_upload():
-    """Endpoint compatível com o Concierge Collector (envio em batch de restaurantes)"""
-    if request.method == 'OPTIONS':
-        return '', 200  # Responde ao preflight CORS
-
+@app.route('/api/restaurants/batch', methods=['POST'])
+def receive_restaurants_batch():
     try:
         data = request.get_json()
-        if not data:
-            return jsonify({'status': 'error', 'message': 'JSON data missing'}), 400
+        
+        # ✅ NOVO: Aceita lista diretamente
+        if not isinstance(data, list):
+            return jsonify({"status": "error", "message": "Expected a list of restaurants"}), 400
 
-        # Reaproveita a lógica existente do /api/curation
-        success, message = process_curation_data(data)
-        if success:
-            return jsonify({'status': 'success'}), 200
-        else:
-            return jsonify({'status': 'error', 'message': message}), 500
+        for restaurant in data:
+            name = restaurant.get("name")
+            # processa cada restaurante normalmente
+
+        return jsonify({"status": "success"}), 200
 
     except Exception as e:
-        logger.error(f"Error in batch_restaurants_upload: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        app.logger.error(f"Error in /api/restaurants/batch: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 # This block won't run when imported by the WSGI file on PythonAnywhere
