@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 import traceback
 from flask_cors import CORS
 
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
 # Load environment variables, but use os.environ.get for more reliability
 from dotenv import load_dotenv
 import os
