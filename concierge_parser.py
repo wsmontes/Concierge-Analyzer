@@ -1250,6 +1250,57 @@ def receive_restaurants_batch():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@app.route('/api/restaurants', methods=['GET'])
+def get_all_restaurants():
+    try:
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("DB_PASSWORD")
+        )
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT r.name, r.description, r.transcription, r.timestamp, c.name as curator_name
+            FROM restaurants r
+            LEFT JOIN curators c ON r.curator_id = c.id
+        """)
+        rows = cursor.fetchall()
+
+        restaurants = []
+        for row in rows:
+            name, description, transcription, timestamp, curator_name = row
+
+            # Fetch concepts
+            cursor.execute("""
+                SELECT cc.name, con.value
+                FROM restaurant_concepts rc
+                JOIN concepts con ON rc.concept_id = con.id
+                JOIN concept_categories cc ON con.category_id = cc.id
+                JOIN restaurants r2 ON rc.restaurant_id = r2.id
+                WHERE r2.name = %s
+            """, (name,))
+            concept_rows = cursor.fetchall()
+            concepts = [{'category': cat, 'value': val} for cat, val in concept_rows]
+
+            restaurants.append({
+                'name': name,
+                'description': description,
+                'transcription': transcription,
+                'timestamp': timestamp.isoformat() if timestamp else None,
+                'curator': {'name': curator_name},
+                'concepts': concepts
+            })
+
+        cursor.close()
+        conn.close()
+
+        return jsonify(restaurants)
+    except Exception as e:
+        app.logger.error(f"Error fetching restaurants: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 # This block won't run when imported by the WSGI file on PythonAnywhere
 # but will run when executing the script directly during development
