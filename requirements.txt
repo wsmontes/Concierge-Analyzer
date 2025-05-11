@@ -26,4 +26,4 @@ requests==2.31.0  # For HTTP requests
 jsonschema==4.19.1  # For JSON validation
 
 # Database
-psycopg2-binary>=2.9.3
+psycopg2-binary==2.9.9

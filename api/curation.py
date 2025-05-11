@@ -1,45 +1,21 @@
 """
-Concierge Analyzer Flask Application
-Main application file for the Concierge Analyzer service that processes restaurant data.
-Dependencies: Flask, psycopg2, dotenv
+Curation API Endpoint
+Handles requests from the Concierge Collector to store restaurant data.
+Dependencies: psycopg2
 """
 
-from flask import Flask, jsonify, request
-from datetime import datetime
 import os
-import logging
-from dotenv import load_dotenv
 import psycopg2
-import traceback
-
-# Load environment variables
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(BASE_DIR, '.env'))
-
-# Initialize Flask app - make sure it's imported by concierge_parser
-app = Flask(__name__, static_folder="static", template_folder="templates")
+import logging
+from flask import request, jsonify, Blueprint
 
 # Configure logging
-logging.basicConfig(level=logging.INFO,
-                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Import the blueprint
-from api.curation import curation_bp
+# Create blueprint for API routes
+curation_bp = Blueprint('curation', __name__)
 
-# Register the blueprint
-app.register_blueprint(curation_bp)
-
-@app.route('/status', methods=['GET'])
-def status():
-    """Health check endpoint to verify server is running"""
-    return jsonify({
-        "status": "ok",
-        "version": "1.1.2",
-        "timestamp": datetime.now().isoformat()
-    })
-
-@app.route('/api/curation', methods=['POST'])
+@curation_bp.route('/api/curation', methods=['POST'])
 def receive_curation_data():
     """
     Endpoint to receive curation data from Concierge Collector.
@@ -65,11 +41,11 @@ def receive_curation_data():
         if success:
             return jsonify({"status": "success"}), 200
         else:
-            app.logger.error(f"Data processing failed: {message}")
+            logger.error(f"Data processing failed: {message}")
             return jsonify({"status": "error", "message": message}), 500
             
     except Exception as e:
-        app.logger.error(f"Error in curation endpoint: {str(e)}")
+        logger.error(f"Error in curation endpoint: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 def process_curation_data(data):
@@ -145,7 +121,7 @@ def process_curation_data(data):
                     (category_id, value)
                 )
             else:
-                app.logger.warning(
+                logger.warning(
                     f"Category '{category_name}' not found in concept_categories"
                 )
         
@@ -193,11 +169,11 @@ def process_curation_data(data):
                         (restaurant_id, concept_id)
                     )
                 else:
-                    app.logger.warning(
+                    logger.warning(
                         f"Concept '{concept_value}' not found"
                     )
             else:
-                app.logger.warning(
+                logger.warning(
                     f"Restaurant '{restaurant_name}' not found"
                 )
         
@@ -207,7 +183,7 @@ def process_curation_data(data):
         return True, "Data processed successfully"
         
     except Exception as e:
-        app.logger.error(f"Error processing curation data: {str(e)}")
+        logger.error(f"Error processing curation data: {str(e)}")
         if conn:
             conn.rollback()
         return False, str(e)

@@ -27,6 +27,7 @@ from dotenv import load_dotenv
 import os
 import io
 import sys
+import psycopg2  # Added for PostgreSQL database connectivity
 
 # Get the correct paths for PythonAnywhere
 PYTHONANYWHERE = 'PYTHONANYWHERE_DOMAIN' in os.environ
