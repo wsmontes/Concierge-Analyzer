@@ -1231,23 +1231,95 @@ def get_sheet_restaurants():
 
 
 @app.route('/api/restaurants/batch', methods=['POST'])
-def receive_restaurants_batch():
+def batch_insert_restaurants():
     try:
         data = request.get_json()
-        
-        # ✅ NOVO: Aceita lista diretamente
         if not isinstance(data, list):
             return jsonify({"status": "error", "message": "Expected a list of restaurants"}), 400
 
-        for restaurant in data:
-            name = restaurant.get("name")
-            # processa cada restaurante normalmente
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("DB_PASSWORD")
+        )
+        cursor = conn.cursor()
+
+        for r in data:
+            # Insert curator if doesn't exist
+            curator_name = r.get("curator", {}).get("name", "Unknown")
+            cursor.execute("""
+                INSERT INTO curators (name)
+                VALUES (%s)
+                ON CONFLICT (name) DO NOTHING
+            """, (curator_name,))
+            
+            # Get curator ID
+            cursor.execute("SELECT id FROM curators WHERE name = %s", (curator_name,))
+            curator_id = cursor.fetchone()[0]
+
+            # Insert restaurant
+            cursor.execute("""
+                INSERT INTO restaurants (name, description, transcription, timestamp, curator_id)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (name) DO NOTHING
+            """, (
+                r.get("name"),
+                r.get("description"),
+                r.get("transcription"),
+                r.get("timestamp"),
+                curator_id
+            ))
+
+            # Get restaurant ID
+            cursor.execute("SELECT id FROM restaurants WHERE name = %s", (r.get("name"),))
+            restaurant_id = cursor.fetchone()[0]
+
+            # Process concepts
+            for c in r.get("concepts", []):
+                category = c.get("category")
+                value = c.get("value")
+                if not category or not value:
+                    continue
+                
+                # Get category ID
+                cursor.execute("SELECT id FROM concept_categories WHERE name = %s", (category,))
+                result = cursor.fetchone()
+                if result:
+                    category_id = result[0]
+                else:
+                    continue  # skip unknown categories
+
+                # Insert concept if not exists
+                cursor.execute("""
+                    INSERT INTO concepts (category_id, value)
+                    VALUES (%s, %s)
+                    ON CONFLICT (category_id, value) DO NOTHING
+                """, (category_id, value))
+
+                # Get concept ID
+                cursor.execute("""
+                    SELECT id FROM concepts WHERE category_id = %s AND value = %s
+                """, (category_id, value))
+                concept_id = cursor.fetchone()[0]
+
+                # Insert restaurant_concept
+                cursor.execute("""
+                    INSERT INTO restaurant_concepts (restaurant_id, concept_id)
+                    VALUES (%s, %s)
+                    ON CONFLICT (restaurant_id, concept_id) DO NOTHING
+                """, (restaurant_id, concept_id))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
 
         return jsonify({"status": "success"}), 200
 
     except Exception as e:
-        app.logger.error(f"Error in /api/restaurants/batch: {str(e)}")
+        app.logger.error(f"Error in batch insert: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 @app.route('/api/restaurants', methods=['GET'])
