@@ -706,7 +706,7 @@ class ConciergeParser:
             persona_id = next((msg.get('persona_id') for msg in conversation if 'persona_id' in msg), None)
             persona_description = next((msg.get('persona_description') for msg in conversation if 'persona_description' in msg), None)
             
-            # Add recommendation evaluation if available
+            # Add recommendation accuracy if available
             recommendation_accuracy = None
             for msg in conversation:
                 if msg['type'] == 'recommendation' and 'recommendation_evaluation' in msg:
@@ -1619,6 +1619,102 @@ def create_restaurant_staging():
         }), 201
     except Exception as e:
         app.logger.error(f"Error creating restaurant staging: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# Helper function to get available columns from restaurants_staging
+def get_staging_columns():
+    """
+    Get a list of column names from the restaurants_staging table
+    
+    Returns:
+        set: Set of column names
+    """
+    try:
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("DB_PASSWORD")
+        )
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name='restaurants_staging'
+        """)
+        
+        columns = {row[0] for row in cursor.fetchall()}
+        
+        cursor.close()
+        conn.close()
+        
+        return columns
+    except Exception as e:
+        app.logger.error(f"Error fetching restaurant staging columns: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        return set()
+
+@app.route('/api/restaurants-staging/distinct/<field>', methods=['GET'])
+def get_distinct_field(field):
+    """
+    Get distinct values for a specific field from restaurants_staging table
+    
+    Parameters:
+        field (str): The column name to get distinct values from
+    
+    Returns:
+        JSON array of distinct values, sorted alphabetically
+    
+    Example:
+    curl "https://<host>/api/restaurants-staging/distinct/country"
+    """
+    try:
+        # Verify that the field exists in the table
+        allowed_fields = get_staging_columns()
+        if not field or field not in allowed_fields:
+            return jsonify({
+                'status': 'error',
+                'message': f"Invalid field '{field}'. Available fields: {', '.join(sorted(allowed_fields))}"
+            }), 400
+        
+        # Connect to database
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("DB_PASSWORD")
+        )
+        cursor = conn.cursor()
+        
+        # Build and execute query using string formatting with column name validation
+        # Since we already validated the field name against database columns, this is safe
+        query = f"SELECT DISTINCT {field} FROM restaurants_staging WHERE {field} IS NOT NULL ORDER BY {field} ASC"
+        cursor.execute(query)
+        
+        # Extract values from the result
+        values = [row[0] for row in cursor.fetchall()]
+        
+        # Handle special cases for serialization
+        serialized_values = []
+        for value in values:
+            # Convert datetime objects to ISO format for JSON serialization
+            if isinstance(value, datetime):
+                serialized_values.append(value.isoformat())
+            else:
+                serialized_values.append(value)
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            'status': 'success',
+            'field': field,
+            'count': len(serialized_values),
+            'values': serialized_values
+        })
+    except Exception as e:
+        app.logger.error(f"Error getting distinct values for field '{field}': {str(e)}")
         app.logger.error(traceback.format_exc())
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
