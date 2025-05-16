@@ -1374,6 +1374,254 @@ def get_all_restaurants():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+# New endpoint: /api/restaurants-staging
+# Handles GET (search/filter/pagination) and POST (create) operations
+
+@app.route('/api/restaurants-staging', methods=['GET'])
+def get_restaurants_staging():
+    """
+    GET endpoint for restaurants_staging table with filtering and pagination.
+    
+    Query Parameters:
+    - Any column name from restaurants_staging table (e.g. name, address, country)
+    - latitude, longitude, tolerance: For proximity search
+    - page: Page number (default: 1)
+    - per_page: Results per page (default: 20)
+    
+    Returns:
+    - JSON with results, count, and search parameters
+    
+    Example:
+    curl "https://<host>/api/restaurants-staging?name=King&country=China%20Mainland"
+    curl "https://<host>/api/restaurants-staging?latitude=39.946681&longitude=116.410004&tolerance=0.001"
+    """
+    try:
+        # Connect to database
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("DB_PASSWORD")
+        )
+        cursor = conn.cursor()
+        
+        # Get pagination parameters
+        page = max(1, int(request.args.get('page', 1)))
+        per_page = min(100, max(1, int(request.args.get('per_page', 20))))
+        offset = (page - 1) * per_page
+        
+        # Extract query parameters (excluding pagination)
+        query_params = {}
+        geo_search = False
+        for key, value in request.args.items():
+            if key not in ['page', 'per_page']:
+                if key in ['latitude', 'longitude', 'tolerance']:
+                    # Handle special geo search parameters
+                    if key in ['latitude', 'longitude']:
+                        try:
+                            query_params[key] = float(value)
+                            geo_search = True
+                        except ValueError:
+                            return jsonify({
+                                'status': 'error', 
+                                'message': f"Invalid {key} value: must be a number"
+                            }), 400
+                    elif key == 'tolerance':
+                        try:
+                            query_params[key] = float(value)
+                        except ValueError:
+                            query_params[key] = 0.0005  # Default tolerance
+                else:
+                    # Regular query parameter
+                    query_params[key] = value
+        
+        # If geo search is requested but missing parameters, return error
+        if geo_search and ('latitude' not in query_params or 'longitude' not in query_params):
+            return jsonify({
+                'status': 'error', 
+                'message': "Both latitude and longitude must be provided for geo search"
+            }), 400
+        
+        # Set default tolerance if not provided
+        if geo_search and 'tolerance' not in query_params:
+            query_params['tolerance'] = 0.0005
+
+        # Build the WHERE clause for filtering
+        where_conditions = []
+        query_values = []
+        
+        # Special handling for geo search
+        if geo_search:
+            where_conditions.append(
+                "latitude BETWEEN %s AND %s AND longitude BETWEEN %s AND %s"
+            )
+            lat = query_params['latitude']
+            lon = query_params['longitude']
+            tol = query_params['tolerance']
+            query_values.extend([lat - tol, lat + tol, lon - tol, lon + tol])
+        
+        # Regular field filters
+        for key, value in query_params.items():
+            if key not in ['latitude', 'longitude', 'tolerance']:
+                where_conditions.append(f"{key} ILIKE %s")
+                query_values.append(f"%{value}%")
+        
+        # Construct the SQL query
+        count_sql = "SELECT COUNT(*) FROM restaurants_staging"
+        query_sql = "SELECT * FROM restaurants_staging"
+        
+        if where_conditions:
+            where_clause = " WHERE " + " AND ".join(where_conditions)
+            count_sql += where_clause
+            query_sql += where_clause
+        
+        # Add pagination
+        query_sql += " ORDER BY id LIMIT %s OFFSET %s"
+        query_values.extend([per_page, offset])
+        
+        # Execute count query
+        cursor.execute(count_sql, query_values[:-2] if where_conditions else [])
+        total_count = cursor.fetchone()[0]
+        
+        # Execute the main query
+        cursor.execute(query_sql, query_values)
+        rows = cursor.fetchall()
+        
+        # Get column names from cursor description
+        columns = [desc[0] for desc in cursor.description]
+        
+        # Convert rows to dictionaries
+        results = []
+        for row in rows:
+            result = {}
+            for i, value in enumerate(row):
+                # Convert datetime objects to ISO format for JSON serialization
+                if isinstance(value, datetime):
+                    value = value.isoformat()
+                result[columns[i]] = value
+            results.append(result)
+        
+        # Prepare response
+        response = {
+            'status': 'success',
+            'count': total_count,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total_count + per_page - 1) // per_page,
+            'search_params': {k: v for k, v in query_params.items() if k not in ['tolerance']},
+            'results': results
+        }
+        
+        cursor.close()
+        conn.close()
+        return jsonify(response)
+    except Exception as e:
+        app.logger.error(f"Error fetching restaurants staging: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/restaurants-staging', methods=['POST'])
+def create_restaurant_staging():
+    """
+    POST endpoint to insert a new record into restaurants_staging table.
+    
+    Required fields:
+    - name
+    - address
+    - country
+    
+    Returns:
+    - JSON with status and created restaurant data
+    
+    Example:
+    curl -X POST -H "Content-Type: application/json" -d '{
+      "name": "Novo Restaurante",
+      "address": "Rua Teste, 123",
+      "country": "Brasil",
+      "latitude": -23.5,
+      "longitude": -46.6
+    }' https://<host>/api/restaurants-staging
+    """
+    try:
+        # Validate content type
+        if not request.is_json:
+            return jsonify({
+                'status': 'error', 
+                'message': 'Content-Type must be application/json'
+            }), 400
+        
+        # Get JSON data
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['name', 'address', 'country']
+        missing_fields = [field for field in required_fields if field not in data]
+        
+        if missing_fields:
+            return jsonify({
+                'status': 'error',
+                'message': f"Missing required fields: {', '.join(missing_fields)}"
+            }), 400
+        
+        # Connect to database
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("DB_PASSWORD")
+        )
+        cursor = conn.cursor()
+        
+        # Get table columns to validate input fields
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'restaurants_staging'
+        """)
+        valid_columns = [row[0] for row in cursor.fetchall()]
+        
+        # Filter data to include only valid columns
+        filtered_data = {k: v for k, v in data.items() if k in valid_columns}
+        
+        # Build dynamic INSERT query
+        columns = ', '.join(filtered_data.keys())
+        placeholders = ', '.join(['%s'] * len(filtered_data))
+        values = list(filtered_data.values())
+        
+        # Execute the query
+        cursor.execute(f"""
+            INSERT INTO restaurants_staging ({columns})
+            VALUES ({placeholders})
+            RETURNING *
+        """, values)
+        
+        # Get the inserted row
+        result = cursor.fetchone()
+        
+        # Convert to dictionary
+        created_restaurant = {}
+        for i, col in enumerate([desc[0] for desc in cursor.description]):
+            # Convert datetime objects to ISO format for JSON serialization
+            if isinstance(result[i], datetime):
+                created_restaurant[col] = result[i].isoformat()
+            else:
+                created_restaurant[col] = result[i]
+        
+        # Commit the transaction
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Restaurant created successfully',
+            'restaurant': created_restaurant
+        }), 201
+    except Exception as e:
+        app.logger.error(f"Error creating restaurant staging: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 # This block won't run when imported by the WSGI file on PythonAnywhere
 # but will run when executing the script directly during development
 if __name__ == "__main__":
