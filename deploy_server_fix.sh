@@ -30,13 +30,16 @@ echo "
 3. 🔄 Pull latest changes:
    git pull origin main
 
-4. 🏥 Test database health:
+4. 🗄️ **CRITICAL: Run database migration to add server_id column:**
+   python3 migrate_database_schema.py
+
+5. 🏥 Test database health:
    curl https://wsmontes.pythonanywhere.com/api/health
 
-5. 🔄 Reload web app:
+6. 🔄 Reload web app:
    - Click 'Reload wsmontes.pythonanywhere.com' button in Web tab
 
-6. ✅ Test the fixed endpoint:
+7. ✅ Test the fixed endpoint:
    curl https://wsmontes.pythonanywhere.com/api/restaurants
 
 EXPECTED RESULTS:
