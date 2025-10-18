@@ -119,17 +119,18 @@ def process_curation_data(data):
             if not name:
                 continue  # Skip entries without a name
                 
-            # Insert restaurant if not exists
+            # Insert restaurant if not exists, including server_id for sync tracking
             cursor.execute(
                 """
-                INSERT INTO restaurants (name, description, transcription, timestamp)
-                VALUES (%s, %s, %s, NOW())
+                INSERT INTO restaurants (name, description, transcription, timestamp, server_id)
+                VALUES (%s, %s, %s, NOW(), %s)
                 ON CONFLICT (name) DO NOTHING
                 """,
                 (
                     name,
                     restaurant.get("description"),
-                    restaurant.get("transcription")
+                    restaurant.get("transcription"),
+                    restaurant.get("server_id")  # Track server ID for sync purposes
                 )
             )
         
@@ -1260,15 +1261,16 @@ def batch_insert_restaurants():
 
             # Insert restaurant
             cursor.execute("""
-                INSERT INTO restaurants (name, description, transcription, timestamp, curator_id)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO restaurants (name, description, transcription, timestamp, curator_id, server_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (name) DO NOTHING
             """, (
                 r.get("name"),
                 r.get("description"),
                 r.get("transcription"),
                 r.get("timestamp"),
-                curator_id
+                curator_id,
+                r.get("server_id")  # Include server_id for sync tracking
             ))
 
             # Get restaurant ID
@@ -1334,7 +1336,8 @@ def get_all_restaurants():
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT r.name, r.description, r.transcription, r.timestamp, c.name as curator_name
+            SELECT r.id, r.name, r.description, r.transcription, r.timestamp, 
+                   r.server_id, c.name as curator_name, c.id as curator_id
             FROM restaurants r
             LEFT JOIN curators c ON r.curator_id = c.id
         """)
@@ -1342,7 +1345,7 @@ def get_all_restaurants():
 
         restaurants = []
         for row in rows:
-            name, description, transcription, timestamp, curator_name = row
+            r_id, name, description, transcription, timestamp, server_id, curator_name, curator_id = row
 
             # Fetch concepts
             cursor.execute("""
@@ -1350,18 +1353,19 @@ def get_all_restaurants():
                 FROM restaurant_concepts rc
                 JOIN concepts con ON rc.concept_id = con.id
                 JOIN concept_categories cc ON con.category_id = cc.id
-                JOIN restaurants r2 ON rc.restaurant_id = r2.id
-                WHERE r2.name = %s
-            """, (name,))
+                WHERE rc.restaurant_id = %s
+            """, (r_id,))
             concept_rows = cursor.fetchall()
             concepts = [{'category': cat, 'value': val} for cat, val in concept_rows]
 
             restaurants.append({
+                'id': r_id,
                 'name': name,
                 'description': description,
                 'transcription': transcription,
                 'timestamp': timestamp.isoformat() if timestamp else None,
-                'curator': {'name': curator_name},
+                'server_id': server_id,
+                'curator': {'id': curator_id, 'name': curator_name},
                 'concepts': concepts
             })
 
@@ -1717,6 +1721,490 @@ def get_distinct_field(field):
         app.logger.error(f"Error getting distinct values for field '{field}': {str(e)}")
         app.logger.error(traceback.format_exc())
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ==========================================
+# NEW SYNC ENDPOINTS FOR CRUD OPERATIONS
+# ==========================================
+
+@app.route('/api/restaurants/<int:restaurant_id>', methods=['GET'])
+def get_restaurant(restaurant_id):
+    """
+    GET endpoint to fetch a specific restaurant by ID.
+    
+    Parameters:
+        restaurant_id (int): The ID of the restaurant to fetch
+    
+    Returns:
+        JSON with restaurant data including concepts
+    
+    Example:
+    curl "https://<host>/api/restaurants/123"
+    """
+    try:
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("DB_PASSWORD")
+        )
+        cursor = conn.cursor()
+
+        # Get restaurant basic info
+        cursor.execute("""
+            SELECT r.id, r.name, r.description, r.transcription, r.timestamp, 
+                   r.server_id, c.name as curator_name, c.id as curator_id
+            FROM restaurants r
+            LEFT JOIN curators c ON r.curator_id = c.id
+            WHERE r.id = %s
+        """, (restaurant_id,))
+        
+        row = cursor.fetchone()
+        if not row:
+            cursor.close()
+            conn.close()
+            return jsonify({'status': 'error', 'message': 'Restaurant not found'}), 404
+
+        r_id, name, description, transcription, timestamp, server_id, curator_name, curator_id = row
+
+        # Fetch concepts
+        cursor.execute("""
+            SELECT cc.name, con.value
+            FROM restaurant_concepts rc
+            JOIN concepts con ON rc.concept_id = con.id
+            JOIN concept_categories cc ON con.category_id = cc.id
+            WHERE rc.restaurant_id = %s
+        """, (restaurant_id,))
+        concept_rows = cursor.fetchall()
+        concepts = [{'category': cat, 'value': val} for cat, val in concept_rows]
+
+        restaurant = {
+            'id': r_id,
+            'name': name,
+            'description': description,
+            'transcription': transcription,
+            'timestamp': timestamp.isoformat() if timestamp else None,
+            'server_id': server_id,
+            'curator': {'id': curator_id, 'name': curator_name},
+            'concepts': concepts
+        }
+
+        cursor.close()
+        conn.close()
+
+        return jsonify(restaurant)
+    except Exception as e:
+        app.logger.error(f"Error fetching restaurant {restaurant_id}: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/restaurants/<int:restaurant_id>', methods=['PUT'])
+def update_restaurant(restaurant_id):
+    """
+    PUT endpoint to update an existing restaurant.
+    
+    Parameters:
+        restaurant_id (int): The ID of the restaurant to update
+    
+    Request body should contain restaurant fields to update
+    
+    Returns:
+        JSON with updated restaurant data
+    
+    Example:
+    curl -X PUT -H "Content-Type: application/json" -d '{
+      "name": "Updated Restaurant Name",
+      "description": "Updated description"
+    }' https://<host>/api/restaurants/123
+    """
+    try:
+        if not request.is_json:
+            return jsonify({'status': 'error', 'message': 'Content-Type must be application/json'}), 400
+            
+        data = request.get_json()
+        
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("DB_PASSWORD")
+        )
+        cursor = conn.cursor()
+
+        # Check if restaurant exists
+        cursor.execute("SELECT id FROM restaurants WHERE id = %s", (restaurant_id,))
+        if not cursor.fetchone():
+            cursor.close()
+            conn.close()
+            return jsonify({'status': 'error', 'message': 'Restaurant not found'}), 404
+
+        # Build dynamic UPDATE query based on provided fields
+        update_fields = []
+        update_values = []
+        
+        allowed_fields = ['name', 'description', 'transcription', 'curator_id', 'server_id']
+        for field in allowed_fields:
+            if field in data:
+                update_fields.append(f"{field} = %s")
+                update_values.append(data[field])
+        
+        if not update_fields:
+            cursor.close()
+            conn.close()
+            return jsonify({'status': 'error', 'message': 'No valid fields to update'}), 400
+        
+        # Add restaurant_id for WHERE clause
+        update_values.append(restaurant_id)
+        
+        # Execute update
+        update_query = f"UPDATE restaurants SET {', '.join(update_fields)} WHERE id = %s"
+        cursor.execute(update_query, update_values)
+        
+        # Handle concepts update if provided
+        if 'concepts' in data:
+            # Delete existing concepts
+            cursor.execute("DELETE FROM restaurant_concepts WHERE restaurant_id = %s", (restaurant_id,))
+            
+            # Insert new concepts
+            for concept in data['concepts']:
+                category = concept.get('category')
+                value = concept.get('value')
+                if not category or not value:
+                    continue
+                
+                # Get or create category
+                cursor.execute("""
+                    INSERT INTO concept_categories (name)
+                    VALUES (%s)
+                    ON CONFLICT (name) DO NOTHING
+                """, (category,))
+                
+                cursor.execute("SELECT id FROM concept_categories WHERE name = %s", (category,))
+                category_id = cursor.fetchone()[0]
+                
+                # Get or create concept
+                cursor.execute("""
+                    INSERT INTO concepts (category_id, value)
+                    VALUES (%s, %s)
+                    ON CONFLICT (category_id, value) DO NOTHING
+                """, (category_id, value))
+                
+                cursor.execute("""
+                    SELECT id FROM concepts WHERE category_id = %s AND value = %s
+                """, (category_id, value))
+                concept_id = cursor.fetchone()[0]
+                
+                # Link to restaurant
+                cursor.execute("""
+                    INSERT INTO restaurant_concepts (restaurant_id, concept_id)
+                    VALUES (%s, %s)
+                    ON CONFLICT (restaurant_id, concept_id) DO NOTHING
+                """, (restaurant_id, concept_id))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        # Return updated restaurant
+        return get_restaurant(restaurant_id)
+        
+    except Exception as e:
+        app.logger.error(f"Error updating restaurant {restaurant_id}: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/restaurants/<int:restaurant_id>', methods=['DELETE'])
+def delete_restaurant(restaurant_id):
+    """
+    DELETE endpoint to remove a restaurant and all its relationships.
+    
+    Parameters:
+        restaurant_id (int): The ID of the restaurant to delete
+    
+    Returns:
+        JSON with deletion status
+    
+    Example:
+    curl -X DELETE https://<host>/api/restaurants/123
+    """
+    try:
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("DB_PASSWORD")
+        )
+        cursor = conn.cursor()
+
+        # Check if restaurant exists
+        cursor.execute("SELECT name FROM restaurants WHERE id = %s", (restaurant_id,))
+        result = cursor.fetchone()
+        if not result:
+            cursor.close()
+            conn.close()
+            return jsonify({'status': 'error', 'message': 'Restaurant not found'}), 404
+        
+        restaurant_name = result[0]
+
+        # Delete restaurant concepts (cascade)
+        cursor.execute("DELETE FROM restaurant_concepts WHERE restaurant_id = %s", (restaurant_id,))
+        concepts_deleted = cursor.rowcount
+        
+        # Delete restaurant
+        cursor.execute("DELETE FROM restaurants WHERE id = %s", (restaurant_id,))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Restaurant "{restaurant_name}" deleted successfully',
+            'deleted_restaurant_id': restaurant_id,
+            'deleted_concepts': concepts_deleted
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error deleting restaurant {restaurant_id}: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/restaurants/server-ids', methods=['GET'])
+def get_restaurants_with_server_ids():
+    """
+    GET endpoint to fetch all restaurants with their server IDs for sync operations.
+    
+    Query Parameters:
+        has_server_id: Filter by whether restaurant has server_id (true/false)
+    
+    Returns:
+        JSON array of restaurants with id, name, and server_id fields
+    
+    Example:
+    curl "https://<host>/api/restaurants/server-ids?has_server_id=false"
+    """
+    try:
+        has_server_id = request.args.get('has_server_id')
+        
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("DB_PASSWORD")
+        )
+        cursor = conn.cursor()
+
+        # Build query based on server_id filter
+        if has_server_id == 'true':
+            query = "SELECT id, name, server_id FROM restaurants WHERE server_id IS NOT NULL ORDER BY id"
+        elif has_server_id == 'false':
+            query = "SELECT id, name, server_id FROM restaurants WHERE server_id IS NULL ORDER BY id"
+        else:
+            query = "SELECT id, name, server_id FROM restaurants ORDER BY id"
+        
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+        restaurants = []
+        for row in rows:
+            r_id, name, server_id = row
+            restaurants.append({
+                'id': r_id,
+                'name': name,
+                'server_id': server_id
+            })
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'count': len(restaurants),
+            'restaurants': restaurants
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching restaurants with server IDs: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/restaurants/sync', methods=['POST'])
+def sync_restaurants():
+    """
+    POST endpoint for bulk synchronization operations.
+    Handles create, update, and delete operations in a single transaction.
+    
+    Request body format:
+    {
+        "create": [list of restaurant objects to create],
+        "update": [list of restaurant objects with id to update],
+        "delete": [list of restaurant IDs to delete]
+    }
+    
+    Returns:
+        JSON with sync results including created, updated, and deleted counts
+    
+    Example:
+    curl -X POST -H "Content-Type: application/json" -d '{
+      "create": [{"name": "New Restaurant", "description": "New description"}],
+      "update": [{"id": 123, "name": "Updated Restaurant"}],
+      "delete": [456, 789]
+    }' https://<host>/api/restaurants/sync
+    """
+    try:
+        if not request.is_json:
+            return jsonify({'status': 'error', 'message': 'Content-Type must be application/json'}), 400
+            
+        data = request.get_json()
+        
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("DB_PASSWORD")
+        )
+        cursor = conn.cursor()
+
+        created_count = 0
+        updated_count = 0
+        deleted_count = 0
+        errors = []
+
+        try:
+            # Handle deletions first
+            if 'delete' in data and data['delete']:
+                for restaurant_id in data['delete']:
+                    try:
+                        cursor.execute("DELETE FROM restaurant_concepts WHERE restaurant_id = %s", (restaurant_id,))
+                        cursor.execute("DELETE FROM restaurants WHERE id = %s", (restaurant_id,))
+                        if cursor.rowcount > 0:
+                            deleted_count += 1
+                    except Exception as e:
+                        errors.append(f"Failed to delete restaurant {restaurant_id}: {str(e)}")
+
+            # Handle updates
+            if 'update' in data and data['update']:
+                for restaurant in data['update']:
+                    try:
+                        restaurant_id = restaurant.get('id')
+                        if not restaurant_id:
+                            errors.append("Update operation missing 'id' field")
+                            continue
+                        
+                        # Check if restaurant exists
+                        cursor.execute("SELECT id FROM restaurants WHERE id = %s", (restaurant_id,))
+                        if not cursor.fetchone():
+                            errors.append(f"Restaurant {restaurant_id} not found for update")
+                            continue
+                        
+                        # Build update query
+                        update_fields = []
+                        update_values = []
+                        
+                        allowed_fields = ['name', 'description', 'transcription', 'curator_id', 'server_id']
+                        for field in allowed_fields:
+                            if field in restaurant:
+                                update_fields.append(f"{field} = %s")
+                                update_values.append(restaurant[field])
+                        
+                        if update_fields:
+                            update_values.append(restaurant_id)
+                            update_query = f"UPDATE restaurants SET {', '.join(update_fields)} WHERE id = %s"
+                            cursor.execute(update_query, update_values)
+                            updated_count += 1
+                        
+                    except Exception as e:
+                        errors.append(f"Failed to update restaurant {restaurant.get('id', 'unknown')}: {str(e)}")
+
+            # Handle creations
+            if 'create' in data and data['create']:
+                for restaurant in data['create']:
+                    try:
+                        name = restaurant.get('name')
+                        if not name:
+                            errors.append("Create operation missing 'name' field")
+                            continue
+                        
+                        # Insert restaurant
+                        cursor.execute("""
+                            INSERT INTO restaurants (name, description, transcription, timestamp, curator_id, server_id)
+                            VALUES (%s, %s, %s, NOW(), %s, %s)
+                            RETURNING id
+                        """, (
+                            name,
+                            restaurant.get('description'),
+                            restaurant.get('transcription'),
+                            restaurant.get('curator_id'),
+                            restaurant.get('server_id')
+                        ))
+                        
+                        new_restaurant_id = cursor.fetchone()[0]
+                        created_count += 1
+                        
+                        # Handle concepts if provided
+                        if 'concepts' in restaurant:
+                            for concept in restaurant['concepts']:
+                                category = concept.get('category')
+                                value = concept.get('value')
+                                if not category or not value:
+                                    continue
+                                
+                                # Get or create category
+                                cursor.execute("""
+                                    INSERT INTO concept_categories (name)
+                                    VALUES (%s)
+                                    ON CONFLICT (name) DO NOTHING
+                                """, (category,))
+                                
+                                cursor.execute("SELECT id FROM concept_categories WHERE name = %s", (category,))
+                                category_id = cursor.fetchone()[0]
+                                
+                                # Get or create concept
+                                cursor.execute("""
+                                    INSERT INTO concepts (category_id, value)
+                                    VALUES (%s, %s)
+                                    ON CONFLICT (category_id, value) DO NOTHING
+                                """, (category_id, value))
+                                
+                                cursor.execute("""
+                                    SELECT id FROM concepts WHERE category_id = %s AND value = %s
+                                """, (category_id, value))
+                                concept_id = cursor.fetchone()[0]
+                                
+                                # Link to restaurant
+                                cursor.execute("""
+                                    INSERT INTO restaurant_concepts (restaurant_id, concept_id)
+                                    VALUES (%s, %s)
+                                    ON CONFLICT (restaurant_id, concept_id) DO NOTHING
+                                """, (new_restaurant_id, concept_id))
+                        
+                    except Exception as e:
+                        errors.append(f"Failed to create restaurant {restaurant.get('name', 'unknown')}: {str(e)}")
+
+            # Commit all changes
+            conn.commit()
+            
+        except Exception as e:
+            conn.rollback()
+            raise e
+        
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'status': 'success',
+            'results': {
+                'created': created_count,
+                'updated': updated_count,
+                'deleted': deleted_count,
+                'errors': errors
+            }
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error in sync operation: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 # This block won't run when imported by the WSGI file on PythonAnywhere
 # but will run when executing the script directly during development
