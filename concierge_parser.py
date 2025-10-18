@@ -22,9 +22,6 @@ logger = logging.getLogger(__name__)
 import traceback
 from flask_cors import CORS
 
-app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
-
 # Load environment variables, but use os.environ.get for more reliability
 from dotenv import load_dotenv
 import os
@@ -45,15 +42,63 @@ else:
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 FLASK_SERVER_URL = os.environ.get('FLASK_SERVER_URL', 'https://wsmontes.pythonanywhere.com' if PYTHONANYWHERE else 'http://localhost:5000')
 
-# Initialize the Flask application
+# Initialize the Flask application ONCE
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.logger.setLevel(logging.INFO)
-CORS(app)
 
-# Configure CORS to allow requests from the frontend
+# Configure CORS properly
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
+
+# Database connection helper function
+def get_db_connection():
+    """
+    Create and return a database connection with proper error handling.
+    """
+    try:
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST"),
+            database=os.environ.get("DB_NAME"),
+            user=os.environ.get("DB_USER"),
+            password=os.environ.get("DB_PASSWORD"),
+            connect_timeout=10  # 10 second timeout
+        )
+        return conn
+    except psycopg2.Error as e:
+        app.logger.error(f"Database connection error: {str(e)}")
+        raise
+    except Exception as e:
+        app.logger.error(f"Unexpected database error: {str(e)}")
+        raise
+
+# Database health check endpoint
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """
+    Health check endpoint to verify database connectivity.
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            'status': 'healthy',
+            'database': 'connected',
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        app.logger.error(f"Health check failed: {str(e)}")
+        return jsonify({
+            'status': 'unhealthy',
+            'database': 'disconnected',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 # Define the /api/curation endpoint for restaurant data curation
 @app.route('/api/curation', methods=['POST'])
@@ -1326,34 +1371,43 @@ def batch_insert_restaurants():
 
 @app.route('/api/restaurants', methods=['GET'])
 def get_all_restaurants():
+    """
+    Get all restaurants with their concepts and curator information.
+    Enhanced with better error handling and database connection management.
+    """
+    conn = None
+    cursor = None
     try:
-        conn = psycopg2.connect(
-            host=os.environ.get("DB_HOST"),
-            database=os.environ.get("DB_NAME"),
-            user=os.environ.get("DB_USER"),
-            password=os.environ.get("DB_PASSWORD")
-        )
+        app.logger.info("Fetching all restaurants...")
+        
+        # Use the database connection helper
+        conn = get_db_connection()
         cursor = conn.cursor()
 
+        # Query restaurants with curator information
         cursor.execute("""
             SELECT r.id, r.name, r.description, r.transcription, r.timestamp, 
                    r.server_id, c.name as curator_name, c.id as curator_id
             FROM restaurants r
             LEFT JOIN curators c ON r.curator_id = c.id
+            ORDER BY r.id DESC
         """)
         rows = cursor.fetchall()
+        
+        app.logger.info(f"Found {len(rows)} restaurants")
 
         restaurants = []
         for row in rows:
             r_id, name, description, transcription, timestamp, server_id, curator_name, curator_id = row
 
-            # Fetch concepts
+            # Fetch concepts for this restaurant
             cursor.execute("""
                 SELECT cc.name, con.value
                 FROM restaurant_concepts rc
                 JOIN concepts con ON rc.concept_id = con.id
                 JOIN concept_categories cc ON con.category_id = cc.id
                 WHERE rc.restaurant_id = %s
+                ORDER BY cc.name, con.value
             """, (r_id,))
             concept_rows = cursor.fetchall()
             concepts = [{'category': cat, 'value': val} for cat, val in concept_rows]
@@ -1365,17 +1419,36 @@ def get_all_restaurants():
                 'transcription': transcription,
                 'timestamp': timestamp.isoformat() if timestamp else None,
                 'server_id': server_id,
-                'curator': {'id': curator_id, 'name': curator_name},
+                'curator': {'id': curator_id, 'name': curator_name} if curator_id else None,
                 'concepts': concepts
             })
 
-        cursor.close()
-        conn.close()
-
+        app.logger.info(f"Successfully formatted {len(restaurants)} restaurants")
         return jsonify(restaurants)
+        
+    except psycopg2.Error as e:
+        app.logger.error(f"Database error fetching restaurants: {str(e)}")
+        return jsonify({
+            'status': 'error', 
+            'message': 'Database connection error',
+            'details': str(e)
+        }), 500
     except Exception as e:
-        app.logger.error(f"Error fetching restaurants: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        app.logger.error(f"Unexpected error fetching restaurants: {str(e)}")
+        return jsonify({
+            'status': 'error', 
+            'message': 'Internal server error',
+            'details': str(e)
+        }), 500
+    finally:
+        # Ensure database resources are cleaned up
+        try:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+        except Exception as e:
+            app.logger.error(f"Error closing database connection: {str(e)}")
 
 
 # New endpoint: /api/restaurants-staging
@@ -2204,6 +2277,51 @@ def sync_restaurants():
     except Exception as e:
         app.logger.error(f"Error in sync operation: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# Global error handlers
+@app.errorhandler(500)
+def internal_server_error(error):
+    """Handle 500 internal server errors with detailed logging."""
+    app.logger.error(f"Internal server error: {str(error)}")
+    return jsonify({
+        'status': 'error',
+        'message': 'Internal server error occurred',
+        'timestamp': datetime.now().isoformat()
+    }), 500
+
+@app.errorhandler(404)
+def not_found_error(error):
+    """Handle 404 not found errors."""
+    return jsonify({
+        'status': 'error',
+        'message': 'Resource not found',
+        'timestamp': datetime.now().isoformat()
+    }), 404
+
+@app.errorhandler(400)
+def bad_request_error(error):
+    """Handle 400 bad request errors."""
+    return jsonify({
+        'status': 'error',
+        'message': 'Bad request',
+        'timestamp': datetime.now().isoformat()
+    }), 400
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(error):
+    """Handle any unexpected errors that aren't caught elsewhere."""
+    app.logger.error(f"Unexpected error: {str(error)}")
+    app.logger.error(f"Error type: {type(error).__name__}")
+    import traceback
+    app.logger.error(f"Traceback: {traceback.format_exc()}")
+    
+    return jsonify({
+        'status': 'error',
+        'message': 'An unexpected error occurred',
+        'error_type': type(error).__name__,
+        'timestamp': datetime.now().isoformat()
+    }), 500
 
 
 # This block won't run when imported by the WSGI file on PythonAnywhere
