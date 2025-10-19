@@ -1,0 +1,15 @@
+{
+  "entity_type": "restaurant",
+  "name": "Test Restaurant",
+  "status": "active",
+  "entity_data": {
+    "test": true,
+    "created_via": "api_test",
+    "categories": {
+      "Cuisine": ["Test Cuisine"],
+      "Price Range": ["Mid-range"]
+    }
+  },
+  "created_by": "api-test",
+  "updated_by": "api-test"
+}

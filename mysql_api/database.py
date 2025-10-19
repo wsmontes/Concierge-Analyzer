@@ -9,6 +9,10 @@ import os
 import logging
 from contextlib import contextmanager
 from typing import Optional, Dict, Any
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +57,13 @@ class DatabaseManager:
     def __init__(self):
         self.config = DatabaseConfig()
         self._pool = None
-        self._initialize_pool()
+        # Don't initialize pool immediately - do it lazily
     
     def _initialize_pool(self):
         """Initialize MySQL connection pool"""
+        if self._pool is not None:
+            return  # Already initialized
+            
         try:
             connection_params = self.config.get_connection_params()
             connection_params.update({
@@ -67,6 +74,7 @@ class DatabaseManager:
             
             # Create the pool by making the first connection
             mysql.connector.pooling.MySQLConnectionPool(**connection_params)
+            self._pool = True  # Mark as initialized
             logger.info(f"Database connection pool initialized successfully")
             
         except mysql.connector.Error as e:
@@ -78,6 +86,9 @@ class DatabaseManager:
     
     def get_connection(self):
         """Get a connection from the pool"""
+        if self._pool is None:
+            self._initialize_pool()
+            
         try:
             return mysql.connector.connect(pool_name=self.config.pool_name)
         except mysql.connector.Error as e:
