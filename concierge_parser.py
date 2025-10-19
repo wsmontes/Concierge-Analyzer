@@ -100,11 +100,50 @@ def health_check():
             'timestamp': datetime.now().isoformat()
         }), 500
 
-# Define the /api/curation endpoint for restaurant data curation
+# Define the /api/curation/json endpoint for restaurant JSON storage (Recommended)
+@app.route('/api/curation/json', methods=['POST'])
+def receive_curation_json():
+    """
+    Endpoint to receive curation data from Concierge Collector using JSON storage approach.
+    Accepts array of restaurant JSON objects and stores each as a complete document.
+    This is the recommended approach for flexibility and future-proofing.
+    """
+    try:
+        # Check if content type is JSON
+        if not request.is_json:
+            return jsonify({"status": "error", "message": "Content-Type must be application/json"}), 400
+            
+        data = request.get_json()
+        
+        # Basic validation
+        if not isinstance(data, list):
+            return jsonify({"status": "error", "message": "Expected array of restaurant objects"}), 400
+            
+        if len(data) == 0:
+            return jsonify({"status": "error", "message": "Empty restaurant array"}), 400
+            
+        # Process the data
+        success, message, processed_count = process_restaurants_json(data)
+        
+        if success:
+            return jsonify({
+                "status": "success", 
+                "processed": processed_count,
+                "message": message
+            }), 200
+        else:
+            app.logger.error(f"JSON processing failed: {message}")
+            return jsonify({"status": "error", "message": message}), 500
+            
+    except Exception as e:
+        app.logger.error(f"Error in JSON curation endpoint: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# Define the /api/curation endpoint for restaurant data curation (V1 - Legacy)
 @app.route('/api/curation', methods=['POST'])
 def receive_curation_data():
     """
-    Endpoint to receive curation data from Concierge Collector.
+    Endpoint to receive curation data from Concierge Collector (V1 Legacy Format).
     Processes and stores restaurant data, concepts, and their relationships.
     """
     try:
@@ -132,6 +171,37 @@ def receive_curation_data():
             
     except Exception as e:
         app.logger.error(f"Error in curation endpoint: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# Define the /api/curation/v2 endpoint for restaurant data curation (V2 - New Format)
+@app.route('/api/curation/v2', methods=['POST'])
+def receive_curation_data_v2():
+    """
+    Endpoint to receive curation data from Concierge Collector V2.
+    Processes and stores restaurant data with rich metadata structure.
+    """
+    try:
+        # Check if content type is JSON
+        if not request.is_json:
+            return jsonify({"status": "error", "message": "Content-Type must be application/json"}), 400
+            
+        data = request.get_json()
+        
+        # Basic validation
+        if not isinstance(data, list):
+            return jsonify({"status": "error", "message": "Expected array of restaurants"}), 400
+            
+        # Process the data
+        success, message = process_curation_data_v2(data)
+        
+        if success:
+            return jsonify({"status": "success", "processed": len(data)}), 200
+        else:
+            app.logger.error(f"V2 Data processing failed: {message}")
+            return jsonify({"status": "error", "message": message}), 500
+            
+    except Exception as e:
+        app.logger.error(f"Error in curation V2 endpoint: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 def process_curation_data(data):
@@ -280,6 +350,621 @@ def process_curation_data(data):
             cursor.close()
         if conn:
             conn.close()
+
+
+def process_curation_data_v2(restaurants_data):
+    """
+    Process the V2 curation data and insert it into the database.
+    
+    Args:
+        restaurants_data (list): Array of restaurant objects with metadata and categories
+        
+    Returns:
+        tuple: (success, message) indicating success or failure and a message
+    """
+    conn = None
+    cursor = None
+    
+    try:
+        # Connect to the database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        for restaurant_data in restaurants_data:
+            if 'metadata' not in restaurant_data:
+                continue
+                
+            # Extract metadata components
+            restaurant_metadata = None
+            collector_data = None
+            michelin_data = None
+            google_places_data = None
+            
+            for metadata_item in restaurant_data['metadata']:
+                metadata_type = metadata_item.get('type')
+                if metadata_type == 'restaurant':
+                    restaurant_metadata = metadata_item
+                elif metadata_type == 'collector':
+                    collector_data = metadata_item.get('data', {})
+                elif metadata_type == 'michelin':
+                    michelin_data = metadata_item.get('data', {})
+                elif metadata_type == 'google-places':
+                    google_places_data = metadata_item.get('data', {})
+            
+            # Skip if no collector data (required for restaurant name)
+            if not collector_data or not collector_data.get('name'):
+                continue
+                
+            # Insert/update restaurant
+            restaurant_id = upsert_restaurant_v2(
+                cursor, 
+                collector_data, 
+                restaurant_metadata, 
+                michelin_data, 
+                google_places_data
+            )
+            
+            if restaurant_id:
+                # Process curator categories
+                process_curator_categories_v2(cursor, restaurant_id, restaurant_data)
+                
+                # Process photos if they exist
+                if 'photos' in collector_data:
+                    process_photos_v2(cursor, restaurant_id, collector_data['photos'])
+        
+        # Commit the transaction
+        conn.commit()
+        
+        return True, "V2 data processed successfully"
+        
+    except Exception as e:
+        app.logger.error(f"Error processing V2 curation data: {str(e)}")
+        if conn:
+            conn.rollback()
+        return False, str(e)
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def upsert_restaurant_v2(cursor, collector_data, restaurant_metadata, michelin_data, google_places_data):
+    """
+    Insert or update restaurant with V2 data structure.
+    
+    Returns:
+        int: restaurant_id if successful, None otherwise
+    """
+    try:
+        name = collector_data.get('name')
+        description = collector_data.get('description')
+        transcription = collector_data.get('transcription')
+        
+        # Location data
+        location = collector_data.get('location', {})
+        latitude = location.get('latitude')
+        longitude = location.get('longitude')
+        address = location.get('address')
+        location_entered_by = location.get('enteredBy')
+        
+        # Notes
+        notes = collector_data.get('notes', {})
+        private_notes = notes.get('private')
+        public_notes = notes.get('public')
+        
+        # Restaurant metadata (if exists)
+        local_id = restaurant_metadata.get('id') if restaurant_metadata else None
+        server_id = restaurant_metadata.get('serverId') if restaurant_metadata else None
+        created_timestamp = restaurant_metadata.get('created', {}).get('timestamp') if restaurant_metadata else None
+        curator_id = restaurant_metadata.get('created', {}).get('curator', {}).get('id') if restaurant_metadata else None
+        curator_name = restaurant_metadata.get('created', {}).get('curator', {}).get('name') if restaurant_metadata else None
+        
+        # Sync data
+        sync_data = restaurant_metadata.get('sync', {}) if restaurant_metadata else {}
+        sync_status = sync_data.get('status')
+        last_synced_at = sync_data.get('lastSyncedAt')
+        deleted_locally = sync_data.get('deletedLocally', False)
+        
+        # Michelin data
+        michelin_id = michelin_data.get('michelinId') if michelin_data else None
+        michelin_stars = michelin_data.get('rating', {}).get('stars') if michelin_data else None
+        michelin_distinction = michelin_data.get('rating', {}).get('distinction') if michelin_data else None
+        michelin_description = michelin_data.get('michelinDescription') if michelin_data else None
+        michelin_url = michelin_data.get('michelinUrl') if michelin_data else None
+        
+        # Google Places data
+        google_place_id = google_places_data.get('placeId') if google_places_data else None
+        google_rating = google_places_data.get('rating', {}).get('average') if google_places_data else None
+        google_total_ratings = google_places_data.get('rating', {}).get('totalRatings') if google_places_data else None
+        google_price_level = google_places_data.get('rating', {}).get('priceLevel') if google_places_data else None
+        
+        # Insert or update restaurant (first check if table exists, fall back to legacy if needed)
+        try:
+            cursor.execute("""
+                INSERT INTO restaurants_v2 (
+                    name, description, transcription, 
+                    latitude, longitude, address, location_entered_by,
+                    private_notes, public_notes,
+                    local_id, server_id, created_timestamp, curator_id, curator_name,
+                    sync_status, last_synced_at, deleted_locally,
+                    michelin_id, michelin_stars, michelin_distinction, michelin_description, michelin_url,
+                    google_place_id, google_rating, google_total_ratings, google_price_level,
+                    metadata_json, created_at, updated_at
+                ) VALUES (
+                    %s, %s, %s, 
+                    %s, %s, %s, %s,
+                    %s, %s,
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s,
+                    %s, NOW(), NOW()
+                )
+                ON CONFLICT (name) DO UPDATE SET
+                    description = EXCLUDED.description,
+                    transcription = EXCLUDED.transcription,
+                    latitude = EXCLUDED.latitude,
+                    longitude = EXCLUDED.longitude,
+                    address = EXCLUDED.address,
+                    location_entered_by = EXCLUDED.location_entered_by,
+                    private_notes = EXCLUDED.private_notes,
+                    public_notes = EXCLUDED.public_notes,
+                    server_id = EXCLUDED.server_id,
+                    sync_status = EXCLUDED.sync_status,
+                    last_synced_at = EXCLUDED.last_synced_at,
+                    deleted_locally = EXCLUDED.deleted_locally,
+                    michelin_id = EXCLUDED.michelin_id,
+                    michelin_stars = EXCLUDED.michelin_stars,
+                    michelin_distinction = EXCLUDED.michelin_distinction,
+                    michelin_description = EXCLUDED.michelin_description,
+                    michelin_url = EXCLUDED.michelin_url,
+                    google_place_id = EXCLUDED.google_place_id,
+                    google_rating = EXCLUDED.google_rating,
+                    google_total_ratings = EXCLUDED.google_total_ratings,
+                    google_price_level = EXCLUDED.google_price_level,
+                    metadata_json = EXCLUDED.metadata_json,
+                    updated_at = NOW()
+                RETURNING id
+            """, (
+                name, description, transcription,
+                latitude, longitude, address, location_entered_by,
+                private_notes, public_notes,
+                local_id, server_id, created_timestamp, curator_id, curator_name,
+                sync_status, last_synced_at, deleted_locally,
+                michelin_id, michelin_stars, michelin_distinction, michelin_description, michelin_url,
+                google_place_id, google_rating, google_total_ratings, google_price_level,
+                json.dumps({'michelin': michelin_data, 'google_places': google_places_data}) if (michelin_data or google_places_data) else None
+            ))
+        except psycopg2.errors.UndefinedTable:
+            # Fall back to legacy table if V2 table doesn't exist
+            app.logger.warning("restaurants_v2 table not found, falling back to legacy restaurants table")
+            cursor.execute("""
+                INSERT INTO restaurants (name, description, transcription, server_id, timestamp)
+                VALUES (%s, %s, %s, %s, NOW())
+                ON CONFLICT (name) DO UPDATE SET
+                    description = EXCLUDED.description,
+                    transcription = EXCLUDED.transcription,
+                    server_id = EXCLUDED.server_id
+                RETURNING id
+            """, (name, description, transcription, server_id))
+        
+        result = cursor.fetchone()
+        return result[0] if result else None
+        
+    except Exception as e:
+        app.logger.error(f"Error upserting restaurant: {str(e)}")
+        return None
+
+
+def process_curator_categories_v2(cursor, restaurant_id, restaurant_data):
+    """
+    Process curator categories for a restaurant in V2 format.
+    """
+    # Category mappings from V2 format
+    category_fields = [
+        'Cuisine', 'Menu', 'Price Range', 'Mood', 'Setting', 
+        'Crowd', 'Suitable For', 'Food Style', 'Drinks', 'Special Features'
+    ]
+    
+    for category_name in category_fields:
+        if category_name in restaurant_data:
+            values = restaurant_data[category_name]
+            if isinstance(values, list):
+                for value in values:
+                    if value and value.strip():
+                        # Get or create concept category
+                        cursor.execute("""
+                            INSERT INTO concept_categories (name) 
+                            VALUES (%s) 
+                            ON CONFLICT (name) DO NOTHING
+                            RETURNING id
+                        """, (category_name,))
+                        
+                        result = cursor.fetchone()
+                        if result:
+                            category_id = result[0]
+                        else:
+                            cursor.execute("SELECT id FROM concept_categories WHERE name = %s", (category_name,))
+                            category_id = cursor.fetchone()[0]
+                        
+                        # Get or create concept
+                        cursor.execute("""
+                            INSERT INTO concepts (category_id, value) 
+                            VALUES (%s, %s) 
+                            ON CONFLICT (category_id, value) DO NOTHING
+                            RETURNING id
+                        """, (category_id, value.strip()))
+                        
+                        result = cursor.fetchone()
+                        if result:
+                            concept_id = result[0]
+                        else:
+                            cursor.execute(
+                                "SELECT id FROM concepts WHERE category_id = %s AND value = %s", 
+                                (category_id, value.strip())
+                            )
+                            concept_id = cursor.fetchone()[0]
+                        
+                        # Link restaurant to concept
+                        cursor.execute("""
+                            INSERT INTO restaurant_concepts (restaurant_id, concept_id) 
+                            VALUES (%s, %s) 
+                            ON CONFLICT (restaurant_id, concept_id) DO NOTHING
+                        """, (restaurant_id, concept_id))
+
+
+def process_photos_v2(cursor, restaurant_id, photos):
+    """
+    Process and store photos for a restaurant.
+    """
+    for photo in photos:
+        photo_id = photo.get('id')
+        photo_data = photo.get('photoData')
+        captured_by = photo.get('capturedBy')
+        timestamp = photo.get('timestamp')
+        
+        if photo_data:
+            try:
+                cursor.execute("""
+                    INSERT INTO restaurant_photos (
+                        restaurant_id, photo_id, photo_data, captured_by, timestamp, created_at
+                    ) VALUES (%s, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (restaurant_id, photo_id) DO UPDATE SET
+                        photo_data = EXCLUDED.photo_data,
+                        captured_by = EXCLUDED.captured_by,
+                        timestamp = EXCLUDED.timestamp
+                """, (restaurant_id, photo_id, photo_data, captured_by, timestamp))
+            except psycopg2.errors.UndefinedTable:
+                # Photos table doesn't exist yet, skip photo processing
+                app.logger.warning("restaurant_photos table not found, skipping photo processing")
+                break
+
+
+def process_restaurants_json(restaurants_data):
+    """
+    Process restaurant JSON data and store each restaurant as a complete document.
+    Uses composite key (restaurant_name + city + curator_id) to prevent duplicates.
+    
+    Args:
+        restaurants_data (list): Array of restaurant JSON objects
+        
+    Returns:
+        tuple: (success, message, processed_count)
+    """
+    conn = None
+    cursor = None
+    processed_count = 0
+    skipped_count = 0
+    
+    try:
+        # Connect to the database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        for restaurant_json in restaurants_data:
+            # Extract composite key components
+            name = extract_restaurant_name_from_json(restaurant_json)
+            city = extract_city_from_json(restaurant_json)
+            curator_info = extract_curator_info_from_json(restaurant_json)
+            
+            if not name or not city or not curator_info:
+                app.logger.warning(f"Skipping restaurant without required data: name={name}, city={city}, curator={curator_info}")
+                skipped_count += 1
+                continue
+            
+            curator_id = curator_info.get('id')
+            curator_name = curator_info.get('name')
+            
+            # Extract additional metadata
+            restaurant_id = extract_restaurant_id_from_json(restaurant_json)
+            server_id = extract_server_id_from_json(restaurant_json)
+            location_info = extract_location_info_from_json(restaurant_json)
+            
+            # Store the complete JSON document with composite key
+            try:
+                cursor.execute("""
+                    INSERT INTO restaurants_json (
+                        restaurant_name, city, curator_id, curator_name,
+                        restaurant_id, server_id, restaurant_data,
+                        latitude, longitude, full_address
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (restaurant_name, city, curator_id) DO UPDATE SET
+                        curator_name = EXCLUDED.curator_name,
+                        restaurant_id = EXCLUDED.restaurant_id,
+                        server_id = EXCLUDED.server_id,
+                        restaurant_data = EXCLUDED.restaurant_data,
+                        latitude = EXCLUDED.latitude,
+                        longitude = EXCLUDED.longitude,
+                        full_address = EXCLUDED.full_address,
+                        updated_at = NOW()
+                """, (
+                    name, city, curator_id, curator_name,
+                    restaurant_id, server_id, json.dumps(restaurant_json),
+                    location_info.get('latitude'), location_info.get('longitude'), location_info.get('address')
+                ))
+            except psycopg2.errors.UndefinedTable:
+                # restaurants_json table doesn't exist, create a minimal fallback
+                app.logger.warning("restaurants_json table not found, falling back to legacy processing")
+                skipped_count += 1
+                continue
+            
+            processed_count += 1
+        
+        # Commit the transaction
+        conn.commit()
+        
+        message = f"Successfully processed {processed_count} restaurants"
+        if skipped_count > 0:
+            message += f", skipped {skipped_count} entries"
+        
+        return True, message, processed_count
+        
+    except Exception as e:
+        app.logger.error(f"Error processing JSON restaurant data: {str(e)}")
+        if conn:
+            conn.rollback()
+        return False, str(e), processed_count
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def extract_city_from_json(restaurant_json):
+    """
+    Extract city from JSON structure with priority order:
+    1. Michelin Guide city (most reliable)
+    2. Google Places vicinity/address
+    3. Collector address parsing
+    """
+    try:
+        if 'metadata' not in restaurant_json:
+            return None
+            
+        # Priority 1: Michelin Guide city
+        for metadata_item in restaurant_json['metadata']:
+            if metadata_item.get('type') == 'michelin':
+                data = metadata_item.get('data', {})
+                guide = data.get('guide', {})
+                city = guide.get('city')
+                if city and city.strip():
+                    return city.strip()
+        
+        # Priority 2: Google Places vicinity
+        for metadata_item in restaurant_json['metadata']:
+            if metadata_item.get('type') == 'google-places':
+                data = metadata_item.get('data', {})
+                location = data.get('location', {})
+                vicinity = location.get('vicinity')
+                if vicinity:
+                    # Extract city from vicinity (e.g., "Via Stella, 22, Modena" -> "Modena")
+                    parts = vicinity.split(',')
+                    if len(parts) > 1:
+                        city = parts[-1].strip()
+                        if city and not city.isdigit():
+                            return city
+                
+                # Try formatted address
+                formatted_address = location.get('formattedAddress')
+                if formatted_address:
+                    city = parse_city_from_address(formatted_address)
+                    if city:
+                        return city
+        
+        # Priority 3: Collector address
+        for metadata_item in restaurant_json['metadata']:
+            if metadata_item.get('type') == 'collector':
+                data = metadata_item.get('data', {})
+                location = data.get('location', {})
+                address = location.get('address')
+                if address:
+                    city = parse_city_from_address(address)
+                    if city:
+                        return city
+        
+        return 'Unknown'
+    except Exception as e:
+        app.logger.error(f"Error extracting city: {str(e)}")
+        return 'Unknown'
+
+
+def parse_city_from_address(address):
+    """
+    Parse city from address string.
+    Handles various address formats.
+    """
+    if not address:
+        return None
+    
+    try:
+        parts = [part.strip() for part in address.split(',')]
+        
+        for part in parts:
+            # Skip if it's clearly not a city
+            if not part or part.isdigit() or len(part) < 2:
+                continue
+            
+            # Skip postal codes (mostly numbers)
+            if len(part) <= 6 and part.replace(' ', '').isdigit():
+                continue
+            
+            # Skip common country names
+            if part.upper() in ['ITALY', 'FRANCE', 'USA', 'UNITED STATES', 'UK', 'GERMANY', 'SPAIN', 'JAPAN']:
+                continue
+            
+            # Skip street addresses (start with numbers)
+            if part[0].isdigit():
+                continue
+            
+            # Clean up postal codes from city names (e.g., "41121 Modena MO" -> "Modena")
+            cleaned = ' '.join([word for word in part.split() if not word.isdigit() and len(word) > 2])
+            if cleaned and len(cleaned) > 1:
+                return cleaned
+        
+        return None
+    except Exception:
+        return None
+
+
+def extract_curator_info_from_json(restaurant_json):
+    """
+    Extract curator information from JSON structure.
+    """
+    try:
+        if 'metadata' not in restaurant_json:
+            return None
+            
+        for metadata_item in restaurant_json['metadata']:
+            if metadata_item.get('type') == 'restaurant':
+                # Try created curator first
+                created = metadata_item.get('created', {})
+                curator = created.get('curator', {})
+                if curator.get('id'):
+                    return {
+                        'id': int(curator['id']),
+                        'name': curator.get('name', 'Unknown')
+                    }
+                
+                # Try modified curator
+                modified = metadata_item.get('modified', {})
+                curator = modified.get('curator', {})
+                if curator.get('id'):
+                    return {
+                        'id': int(curator['id']),
+                        'name': curator.get('name', 'Unknown')
+                    }
+        
+        # Fallback: return unknown curator
+        return {'id': 0, 'name': 'Unknown'}
+    except Exception as e:
+        app.logger.error(f"Error extracting curator info: {str(e)}")
+        return {'id': 0, 'name': 'Unknown'}
+
+
+def extract_location_info_from_json(restaurant_json):
+    """
+    Extract location information from JSON structure.
+    """
+    try:
+        if 'metadata' not in restaurant_json:
+            return {}
+            
+        # Try collector location first
+        for metadata_item in restaurant_json['metadata']:
+            if metadata_item.get('type') == 'collector':
+                data = metadata_item.get('data', {})
+                location = data.get('location', {})
+                if location.get('latitude') and location.get('longitude'):
+                    return {
+                        'latitude': float(location['latitude']),
+                        'longitude': float(location['longitude']),
+                        'address': location.get('address')
+                    }
+        
+        # Try Google Places location
+        for metadata_item in restaurant_json['metadata']:
+            if metadata_item.get('type') == 'google-places':
+                data = metadata_item.get('data', {})
+                location = data.get('location', {})
+                if location.get('latitude') and location.get('longitude'):
+                    return {
+                        'latitude': float(location['latitude']),
+                        'longitude': float(location['longitude']),
+                        'address': location.get('formattedAddress')
+                    }
+        
+        return {}
+    except Exception as e:
+        app.logger.error(f"Error extracting location info: {str(e)}")
+        return {}
+
+
+def extract_restaurant_name_from_json(restaurant_json):
+    """
+    Extract restaurant name from JSON structure.
+    Looks in collector metadata for the name field.
+    """
+    try:
+        if 'metadata' not in restaurant_json:
+            return None
+            
+        for metadata_item in restaurant_json['metadata']:
+            if metadata_item.get('type') == 'collector':
+                data = metadata_item.get('data', {})
+                name = data.get('name')
+                if name:
+                    return name.strip()
+        
+        return None
+    except Exception as e:
+        app.logger.error(f"Error extracting restaurant name: {str(e)}")
+        return None
+
+
+def extract_restaurant_id_from_json(restaurant_json):
+    """
+    Extract restaurant ID from JSON structure.
+    Looks in restaurant metadata for the id field.
+    """
+    try:
+        if 'metadata' not in restaurant_json:
+            return None
+            
+        for metadata_item in restaurant_json['metadata']:
+            if metadata_item.get('type') == 'restaurant':
+                restaurant_id = metadata_item.get('id')
+                if restaurant_id:
+                    return int(restaurant_id)
+        
+        return None
+    except Exception as e:
+        app.logger.error(f"Error extracting restaurant ID: {str(e)}")
+        return None
+
+
+def extract_server_id_from_json(restaurant_json):
+    """
+    Extract server ID from JSON structure.
+    Looks in restaurant metadata for the serverId field.
+    """
+    try:
+        if 'metadata' not in restaurant_json:
+            return None
+            
+        for metadata_item in restaurant_json['metadata']:
+            if metadata_item.get('type') == 'restaurant':
+                server_id = metadata_item.get('serverId')
+                if server_id:
+                    return int(server_id)
+        
+        return None
+    except Exception as e:
+        app.logger.error(f"Error extracting server ID: {str(e)}")
+        return None
+
 
 @app.route('/status', methods=['GET'])
 def status():
