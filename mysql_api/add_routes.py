@@ -4,13 +4,15 @@
 # This script is executed by the WSGI file to integrate the APIs
 #
 
-from mysql_api.app import create_api_response, validate_entity_type
-from mysql_api.database import get_db
-from mysql_api.models import EntityModel, EntityType
+# Import required modules
+from app import create_api_response, validate_entity_type
+from database import get_db
+from models import EntityModel, EntityType
 from flask import request
 import json
 
 # Add MySQL API routes to the existing application
+# Note: 'application' variable should be available from the calling WSGI context
 
 @application.route('/mysql-api/health', methods=['GET'])
 def mysql_health_check():
