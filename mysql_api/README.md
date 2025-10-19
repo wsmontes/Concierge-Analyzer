@@ -16,15 +16,17 @@ The Concierge Entities API is a clean, simple MySQL-based REST API designed to m
 ## Base URL
 
 ```
-Production: https://your-username.pythonanywhere.com/api
+Production: https://wsmontes.pythonanywhere.com/mysql-api
 Development: http://localhost:5001/api
 ```
+
+**Note:** The production API uses the `/mysql-api/` prefix because it's integrated with your existing Concierge Analyzer application.
 
 ## API Endpoints
 
 ### Health Check
 
-#### GET /api/health
+#### GET /mysql-api/health
 Check API and database connectivity.
 
 **Response:**
@@ -42,7 +44,7 @@ Check API and database connectivity.
 }
 ```
 
-#### GET /api/info
+#### GET /mysql-api/info
 Get API information and available endpoints.
 
 **Response:**
