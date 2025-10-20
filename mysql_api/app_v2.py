@@ -9,8 +9,11 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import json
 from datetime import datetime
-from database import get_connection
+from database import DatabaseManager
 from models_v2 import RestaurantV2
+
+# Initialize database manager
+db_manager = DatabaseManager()
 
 app = Flask(__name__)
 
@@ -34,7 +37,7 @@ CORS(app, resources={
 def health_check():
     """Health check endpoint."""
     try:
-        conn = get_connection()
+        conn = db_manager.get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT 1")
         cursor.fetchone()
@@ -65,7 +68,7 @@ def get_restaurants():
         offset = int(request.args.get('offset', 0))
         format_type = request.args.get('format', 'v2')
         
-        conn = get_connection()
+        conn = db_manager.get_connection()
         restaurants = RestaurantV2.get_all(conn, entity_type, limit, offset)
         conn.close()
         
@@ -96,7 +99,7 @@ def get_restaurant(restaurant_id):
     try:
         format_type = request.args.get('format', 'v2')
         
-        conn = get_connection()
+        conn = db_manager.get_connection()
         restaurant = RestaurantV2.get_by_id(conn, restaurant_id)
         conn.close()
         
@@ -128,7 +131,7 @@ def create_restaurant():
         restaurant = RestaurantV2.from_v2_format(v2_data)
         
         # Save to database
-        conn = get_connection()
+        conn = db_manager.get_connection()
         restaurant_id = restaurant.save(conn)
         
         # Retrieve saved restaurant
@@ -157,7 +160,7 @@ def update_restaurant(restaurant_id):
         if not v2_data:
             return jsonify({'error': 'No JSON data provided'}), 400
         
-        conn = get_connection()
+        conn = db_manager.get_connection()
         
         # Check if exists
         restaurant = RestaurantV2.get_by_id(conn, restaurant_id)
@@ -190,7 +193,7 @@ def update_restaurant(restaurant_id):
 def delete_restaurant(restaurant_id):
     """Soft delete restaurant."""
     try:
-        conn = get_connection()
+        conn = db_manager.get_connection()
         restaurant = RestaurantV2.get_by_id(conn, restaurant_id)
         
         if not restaurant:
@@ -218,7 +221,7 @@ def bulk_create_restaurants():
         if not isinstance(v2_array, list):
             return jsonify({'error': 'Expected JSON array'}), 400
         
-        conn = get_connection()
+        conn = db_manager.get_connection()
         created_ids = []
         
         for v2_data in v2_array:
@@ -254,7 +257,7 @@ def search_restaurants():
         limit = int(request.args.get('limit', 20))
         format_type = request.args.get('format', 'v2')
         
-        conn = get_connection()
+        conn = db_manager.get_connection()
         restaurants = RestaurantV2.search_by_name(conn, search_term, limit)
         conn.close()
         
@@ -281,7 +284,7 @@ def search_restaurants():
 def get_restaurant_metadata(restaurant_id):
     """Get all metadata arrays from restaurant."""
     try:
-        conn = get_connection()
+        conn = db_manager.get_connection()
         restaurant = RestaurantV2.get_by_id(conn, restaurant_id)
         conn.close()
         
@@ -302,7 +305,7 @@ def get_restaurant_metadata_by_type(restaurant_id, metadata_type):
     Example: /api/v2/restaurants/1/metadata/michelin
     """
     try:
-        conn = get_connection()
+        conn = db_manager.get_connection()
         restaurant = RestaurantV2.get_by_id(conn, restaurant_id)
         conn.close()
         
