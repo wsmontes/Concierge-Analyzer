@@ -48,7 +48,9 @@ class DatabaseConfig:
             'autocommit': self.autocommit,
             'use_unicode': True,
             'sql_mode': 'STRICT_TRANS_TABLES',
-            'time_zone': '+00:00'  # UTC
+            'time_zone': '+00:00',  # UTC
+            'pool_recycle': 280,  # Recycle connections after 280 seconds (before 5-min timeout)
+            'connect_timeout': 10  # Connection timeout in seconds
         }
 
 class DatabaseManager:
@@ -85,12 +87,13 @@ class DatabaseManager:
             raise
     
     def get_connection(self):
-        """Get a connection from the pool"""
-        if self._pool is None:
-            self._initialize_pool()
-            
+        """Get a connection - using direct connections instead of pooling for PythonAnywhere"""
         try:
-            return mysql.connector.connect(pool_name=self.config.pool_name)
+            # Direct connection without pooling to avoid pool exhaustion on PythonAnywhere
+            connection_params = self.config.get_connection_params()
+            # Remove pool-specific parameters
+            connection_params.pop('pool_recycle', None)
+            return mysql.connector.connect(**connection_params)
         except mysql.connector.Error as e:
             logger.error(f"Failed to get database connection: {e}")
             raise
