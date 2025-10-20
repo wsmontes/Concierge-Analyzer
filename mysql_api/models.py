@@ -239,6 +239,65 @@ class EntityModel:
                 errors.append("entity_data must be valid JSON")
         
         return len(errors) == 0, errors
+    
+    def to_concierge_v2(self) -> Dict[str, Any]:
+        """Export entity in Concierge V2 format for two-way sync"""
+        if 'concierge_v2' in self.entity_data:
+            # Return the original V2 format stored in entity_data
+            v2_data = self.entity_data['concierge_v2'].copy()
+            
+            # Update system metadata with current export info
+            metadata_list = v2_data.get('metadata', [])
+            
+            # Update or add restaurant metadata with current state
+            restaurant_meta = None
+            for i, meta in enumerate(metadata_list):
+                if meta.get('type') == 'restaurant':
+                    restaurant_meta = meta
+                    break
+            
+            if restaurant_meta:
+                # Update existing metadata
+                if not restaurant_meta.get('system'):
+                    restaurant_meta['system'] = {}
+                restaurant_meta['system']['exportedAt'] = datetime.now().isoformat()
+                restaurant_meta['system']['exportFormat'] = 'concierge-v2'
+                restaurant_meta['system']['schemaVersion'] = '2.0'
+                
+                # Update modified timestamp if entity was updated
+                if self.updated_at and self.created_at and self.updated_at > self.created_at:
+                    if not restaurant_meta.get('modified'):
+                        restaurant_meta['modified'] = {}
+                    restaurant_meta['modified']['timestamp'] = self.updated_at.isoformat()
+                    if self.updated_by:
+                        restaurant_meta['modified']['curator'] = {
+                            'name': self.updated_by
+                        }
+            
+            return v2_data
+        else:
+            # Fallback: create minimal V2 structure if not stored in V2 format
+            return {
+                'metadata': [{
+                    'type': 'collector',
+                    'source': 'local',
+                    'origin': 'local',
+                    'data': {
+                        'name': self.name,
+                        'description': self.entity_data.get('description', '') if self.entity_data else ''
+                    }
+                }],
+                'Cuisine': [],
+                'Menu': [],
+                'Price Range': [],
+                'Mood': [],
+                'Setting': [],
+                'Crowd': [],
+                'Suitable For': [],
+                'Food Style': [],
+                'Drinks': [],
+                'Special Features': []
+            }
 
 @dataclass
 class CuratorModel:

@@ -110,7 +110,14 @@ def api_info():
                 "entities": "/api/entities",
                 "curators": "/api/curators",
                 "sync": "/api/sync",
-                "import": "/api/import/concierge-v2"
+                "import": "/api/import/concierge-v2",
+                "export_all": "/api/export/concierge-v2",
+                "export_single": "/api/export/concierge-v2/{entity_id}"
+            },
+            "features": {
+                "two_way_sync": True,
+                "v2_format": True,
+                "bulk_operations": True
             }
         }
     )
@@ -550,6 +557,107 @@ def import_concierge_v2():
         
     except Exception as e:
         logger.error(f"Error in Concierge V2 import: {e}")
+        return create_api_response(
+            status="error",
+            error=str(e),
+            status_code=500
+        )
+
+@app.route('/api/export/concierge-v2', methods=['GET'])
+def export_concierge_v2():
+    """Export entities in Concierge Collector V2 format"""
+    try:
+        db = get_db()
+        
+        # Query parameters for filtering
+        entity_type = request.args.get('entity_type', 'restaurant')
+        status = request.args.get('status')
+        limit = min(int(request.args.get('limit', 100)), 1000)  # Max 1000 entities
+        
+        # Build query
+        where_conditions = ["entity_type = %s"]
+        params = [entity_type]
+        
+        if status:
+            where_conditions.append("status = %s")
+            params.append(status)
+        
+        where_clause = " WHERE " + " AND ".join(where_conditions)
+        
+        # Get entities
+        query = f"""
+            SELECT id, entity_type, name, external_id, status, entity_data, 
+                   created_at, updated_at, created_by, updated_by
+            FROM entities{where_clause}
+            ORDER BY updated_at DESC, id DESC
+            LIMIT %s
+        """
+        params.append(limit)
+        
+        entities_data = db.execute_query(query, tuple(params))
+        
+        # Convert to V2 format
+        v2_export = []
+        for row in entities_data:
+            # Parse JSON entity_data
+            if row['entity_data']:
+                try:
+                    row['entity_data'] = json.loads(row['entity_data'])
+                except json.JSONDecodeError:
+                    row['entity_data'] = {}
+            
+            entity = EntityModel.from_dict(row)
+            v2_export.append(entity.to_concierge_v2())
+        
+        # Return as JSON array (V2 format)
+        return jsonify(v2_export), 200
+        
+    except Exception as e:
+        logger.error(f"Error in Concierge V2 export: {e}")
+        return create_api_response(
+            status="error",
+            error=str(e),
+            status_code=500
+        )
+
+@app.route('/api/export/concierge-v2/<int:entity_id>', methods=['GET'])
+def export_single_concierge_v2(entity_id):
+    """Export a single entity in Concierge Collector V2 format"""
+    try:
+        db = get_db()
+        
+        # Get entity by ID
+        query = """
+            SELECT id, entity_type, name, external_id, status, entity_data, 
+                   created_at, updated_at, created_by, updated_by
+            FROM entities
+            WHERE id = %s
+        """
+        
+        entity_data = db.execute_query(query, (entity_id,), fetch_one=True)
+        
+        if not entity_data:
+            return create_api_response(
+                status="error",
+                error="Entity not found",
+                status_code=404
+            )
+        
+        # Parse JSON entity_data
+        if entity_data['entity_data']:
+            try:
+                entity_data['entity_data'] = json.loads(entity_data['entity_data'])
+            except json.JSONDecodeError:
+                entity_data['entity_data'] = {}
+        
+        entity = EntityModel.from_dict(entity_data)
+        v2_data = entity.to_concierge_v2()
+        
+        # Return as single object wrapped in array (V2 format is always an array)
+        return jsonify([v2_data]), 200
+        
+    except Exception as e:
+        logger.error(f"Error exporting entity {entity_id}: {e}")
         return create_api_response(
             status="error",
             error=str(e),
