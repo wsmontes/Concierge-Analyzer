@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 import traceback
 from flask_cors import CORS
+from flask_compress import Compress
 
 # Load environment variables, but use os.environ.get for more reliability
 from dotenv import load_dotenv
@@ -49,7 +50,31 @@ app.logger.setLevel(logging.INFO)
 # Configure CORS properly
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
+# Enable response compression for bandwidth optimization
+Compress(app)
+
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
+app.config['JSON_SORT_KEYS'] = False  # Disable sorting for faster JSON serialization
+app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False  # Disable pretty-print for smaller responses
+app.config['COMPRESS_MIMETYPES'] = ['application/json', 'text/html', 'text/css', 'text/javascript']
+app.config['COMPRESS_LEVEL'] = 6  # Compression level (1-9, 6 is default balance)
+app.config['COMPRESS_MIN_SIZE'] = 500  # Only compress responses larger than 500 bytes
+
+# Error handler for broken pipe / client disconnect errors
+@app.errorhandler(BrokenPipeError)
+@app.errorhandler(OSError)
+def handle_connection_error(error):
+    """
+    Gracefully handle client disconnection errors (SIGPIPE/Broken Pipe).
+    These occur when clients close connections before receiving full responses.
+    """
+    error_msg = str(error)
+    if 'Broken pipe' in error_msg or 'write error' in error_msg or isinstance(error, BrokenPipeError):
+        app.logger.warning(f"Client disconnected during response: {error_msg}")
+        # Return None to suppress the error from propagating
+        return None
+    # Re-raise if it's a different OSError
+    raise error
 
 # Database connection helper function
 def get_db_connection():
@@ -1964,130 +1989,216 @@ def get_sheet_restaurants():
 @app.route('/api/restaurants/batch', methods=['POST'])
 def batch_insert_restaurants():
     """
-    Batch insert restaurants endpoint.
+    Batch insert restaurants endpoint with improved error handling and client disconnect protection.
     Accepts array of restaurant objects and returns server IDs for each.
+    
+    Enhanced features:
+    - Batch size validation to prevent timeouts
+    - Partial success reporting
+    - Connection error resilience
     
     Dependencies: restaurants, curators, concepts, restaurant_concepts tables
     """
+    conn = None
+    cursor = None
+    
     try:
         data = request.get_json()
         if not isinstance(data, list):
             return jsonify({"status": "error", "message": "Expected a list of restaurants"}), 400
+        
+        # Validate batch size to prevent timeouts
+        MAX_BATCH_SIZE = 50
+        if len(data) > MAX_BATCH_SIZE:
+            return jsonify({
+                "status": "error", 
+                "message": f"Batch size exceeds maximum of {MAX_BATCH_SIZE} restaurants. Please split into smaller batches."
+            }), 400
 
         conn = psycopg2.connect(
             host=os.environ.get("DB_HOST"),
             database=os.environ.get("DB_NAME"),
             user=os.environ.get("DB_USER"),
-            password=os.environ.get("DB_PASSWORD")
+            password=os.environ.get("DB_PASSWORD"),
+            connect_timeout=10
         )
         cursor = conn.cursor()
 
         # Track results for each restaurant
         results = []
+        successful_count = 0
+        failed_count = 0
 
-        for r in data:
-            restaurant_name = r.get("name")
-            local_id = r.get("id")  # Client-side local ID
-            
-            # Insert curator if doesn't exist
-            curator_name = r.get("curator", {}).get("name", "Unknown")
-            cursor.execute("""
-                INSERT INTO curators (name)
-                VALUES (%s)
-                ON CONFLICT (name) DO NOTHING
-            """, (curator_name,))
-            
-            # Get curator ID
-            cursor.execute("SELECT id FROM curators WHERE name = %s", (curator_name,))
-            curator_id = cursor.fetchone()[0]
+        for idx, r in enumerate(data):
+            try:
+                restaurant_name = r.get("name")
+                local_id = r.get("id")  # Client-side local ID
+                
+                if not restaurant_name:
+                    results.append({
+                        "localId": local_id,
+                        "status": "error",
+                        "message": "Missing restaurant name"
+                    })
+                    failed_count += 1
+                    continue
+                
+                # Insert curator if doesn't exist
+                curator_name = r.get("curator", {}).get("name", "Unknown")
+                cursor.execute("""
+                    INSERT INTO curators (name)
+                    VALUES (%s)
+                    ON CONFLICT (name) DO NOTHING
+                """, (curator_name,))
+                
+                # Get curator ID
+                cursor.execute("SELECT id FROM curators WHERE name = %s", (curator_name,))
+                curator_id = cursor.fetchone()[0]
 
-            # Insert restaurant and get server ID
-            cursor.execute("""
-                INSERT INTO restaurants (name, description, transcription, timestamp, curator_id, server_id)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (name) DO UPDATE SET
-                    description = EXCLUDED.description,
-                    transcription = EXCLUDED.transcription,
-                    timestamp = EXCLUDED.timestamp,
-                    curator_id = EXCLUDED.curator_id
-                RETURNING id
-            """, (
-                restaurant_name,
-                r.get("description"),
-                r.get("transcription"),
-                r.get("timestamp"),
-                curator_id,
-                r.get("server_id")  # Include server_id for sync tracking
-            ))
+                # Insert restaurant and get server ID
+                cursor.execute("""
+                    INSERT INTO restaurants (name, description, transcription, timestamp, curator_id, server_id)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (name) DO UPDATE SET
+                        description = EXCLUDED.description,
+                        transcription = EXCLUDED.transcription,
+                        timestamp = EXCLUDED.timestamp,
+                        curator_id = EXCLUDED.curator_id
+                    RETURNING id
+                """, (
+                    restaurant_name,
+                    r.get("description"),
+                    r.get("transcription"),
+                    r.get("timestamp"),
+                    curator_id,
+                    r.get("server_id")  # Include server_id for sync tracking
+                ))
 
-            # Get the server-assigned restaurant ID
-            result = cursor.fetchone()
-            server_id = result[0] if result else None
-            
-            if server_id:
-                # Process concepts
-                for c in r.get("concepts", []):
-                    category = c.get("category")
-                    value = c.get("value")
-                    if not category or not value:
-                        continue
+                # Get the server-assigned restaurant ID
+                result = cursor.fetchone()
+                server_id = result[0] if result else None
+                
+                if server_id:
+                    # Process concepts
+                    for c in r.get("concepts", []):
+                        category = c.get("category")
+                        value = c.get("value")
+                        if not category or not value:
+                            continue
+                        
+                        # Get category ID
+                        cursor.execute("SELECT id FROM concept_categories WHERE name = %s", (category,))
+                        result = cursor.fetchone()
+                        if result:
+                            category_id = result[0]
+                        else:
+                            continue  # skip unknown categories
+
+                        # Insert concept if not exists
+                        cursor.execute("""
+                            INSERT INTO concepts (category_id, value)
+                            VALUES (%s, %s)
+                            ON CONFLICT (category_id, value) DO NOTHING
+                        """, (category_id, value))
+
+                        # Get concept ID
+                        cursor.execute("""
+                            SELECT id FROM concepts WHERE category_id = %s AND value = %s
+                        """, (category_id, value))
+                        concept_id = cursor.fetchone()[0]
+
+                        # Insert restaurant_concept
+                        cursor.execute("""
+                            INSERT INTO restaurant_concepts (restaurant_id, concept_id)
+                            VALUES (%s, %s)
+                            ON CONFLICT (restaurant_id, concept_id) DO NOTHING
+                        """, (server_id, concept_id))
+
+                    # Add to results with local ID mapping
+                    results.append({
+                        "localId": local_id,
+                        "serverId": server_id,
+                        "name": restaurant_name,
+                        "status": "success"
+                    })
+                    successful_count += 1
                     
-                    # Get category ID
-                    cursor.execute("SELECT id FROM concept_categories WHERE name = %s", (category,))
-                    result = cursor.fetchone()
-                    if result:
-                        category_id = result[0]
-                    else:
-                        continue  # skip unknown categories
-
-                    # Insert concept if not exists
-                    cursor.execute("""
-                        INSERT INTO concepts (category_id, value)
-                        VALUES (%s, %s)
-                        ON CONFLICT (category_id, value) DO NOTHING
-                    """, (category_id, value))
-
-                    # Get concept ID
-                    cursor.execute("""
-                        SELECT id FROM concepts WHERE category_id = %s AND value = %s
-                    """, (category_id, value))
-                    concept_id = cursor.fetchone()[0]
-
-                    # Insert restaurant_concept
-                    cursor.execute("""
-                        INSERT INTO restaurant_concepts (restaurant_id, concept_id)
-                        VALUES (%s, %s)
-                        ON CONFLICT (restaurant_id, concept_id) DO NOTHING
-                    """, (server_id, concept_id))
-
-                # Add to results with local ID mapping
+                    # Commit periodically to avoid large transaction buildup
+                    if (idx + 1) % 10 == 0:
+                        conn.commit()
+                        
+                else:
+                    results.append({
+                        "localId": local_id,
+                        "name": restaurant_name,
+                        "status": "error",
+                        "message": "Failed to get server ID"
+                    })
+                    failed_count += 1
+                    
+            except Exception as item_error:
+                app.logger.error(f"Error processing restaurant {idx}: {str(item_error)}")
                 results.append({
-                    "localId": local_id,
-                    "serverId": server_id,
-                    "name": restaurant_name,
-                    "status": "success"
-                })
-            else:
-                results.append({
-                    "localId": local_id,
-                    "name": restaurant_name,
+                    "localId": r.get("id"),
+                    "name": r.get("name", "Unknown"),
                     "status": "error",
-                    "message": "Failed to get server ID"
+                    "message": str(item_error)
                 })
+                failed_count += 1
+                continue
 
+        # Final commit for remaining items
         conn.commit()
-        cursor.close()
-        conn.close()
 
-        return jsonify({
-            "status": "success",
-            "count": len(results),
+        response_data = {
+            "status": "success" if failed_count == 0 else "partial",
+            "summary": {
+                "total": len(data),
+                "successful": successful_count,
+                "failed": failed_count
+            },
             "restaurants": results
-        }), 200
+        }
+        
+        app.logger.info(f"Batch insert completed: {successful_count} successful, {failed_count} failed")
+        
+        return jsonify(response_data), 200 if failed_count == 0 else 207  # 207 = Multi-Status
 
+    except psycopg2.Error as db_error:
+        app.logger.error(f"Database error in batch insert: {str(db_error)}")
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+        return jsonify({
+            "status": "error", 
+            "message": "Database error occurred",
+            "details": str(db_error)
+        }), 500
+        
     except Exception as e:
-        app.logger.error(f"Error in batch insert: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        app.logger.error(f"Unexpected error in batch insert: {str(e)}")
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+        return jsonify({
+            "status": "error", 
+            "message": "Internal server error",
+            "details": str(e)
+        }), 500
+        
+    finally:
+        # Ensure database resources are cleaned up
+        try:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+        except Exception as e:
+            app.logger.error(f"Error closing database connection: {str(e)}")
 
 
 
@@ -2095,58 +2206,114 @@ def batch_insert_restaurants():
 def get_all_restaurants():
     """
     Get all restaurants with their concepts and curator information.
-    Enhanced with better error handling and database connection management.
+    Enhanced with pagination, compression support, and optimized query to prevent SIGPIPE errors.
+    
+    Query parameters:
+    - page: Page number (default: 1)
+    - limit: Items per page (default: 50, max: 100)
+    - simple: If 'true', returns simplified response without concepts (faster)
     """
     conn = None
     cursor = None
     try:
-        app.logger.info("Fetching all restaurants...")
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        limit = min(request.args.get('limit', 50, type=int), 100)  # Cap at 100
+        offset = (page - 1) * limit
+        simple_mode = request.args.get('simple', 'false').lower() == 'true'
         
-        # Use the database connection helper
+        app.logger.info(f"Fetching restaurants (page={page}, limit={limit}, simple={simple_mode})...")
+        
+        # Use the database connection helper with timeout
         conn = get_db_connection()
         cursor = conn.cursor()
+        
+        # Get total count for pagination
+        cursor.execute("SELECT COUNT(*) FROM restaurants")
+        total_count = cursor.fetchone()[0]
 
-        # Query restaurants with curator information
+        # Query restaurants with curator information and pagination
         cursor.execute("""
             SELECT r.id, r.name, r.description, r.transcription, r.timestamp, 
                    r.server_id, c.name as curator_name, c.id as curator_id
             FROM restaurants r
             LEFT JOIN curators c ON r.curator_id = c.id
             ORDER BY r.id DESC
-        """)
+            LIMIT %s OFFSET %s
+        """, (limit, offset))
         rows = cursor.fetchall()
         
-        app.logger.info(f"Found {len(rows)} restaurants")
+        app.logger.info(f"Found {len(rows)} restaurants (total: {total_count})")
 
         restaurants = []
-        for row in rows:
-            r_id, name, description, transcription, timestamp, server_id, curator_name, curator_id = row
-
-            # Fetch concepts for this restaurant
-            cursor.execute("""
-                SELECT cc.name, con.value
-                FROM restaurant_concepts rc
-                JOIN concepts con ON rc.concept_id = con.id
-                JOIN concept_categories cc ON con.category_id = cc.id
-                WHERE rc.restaurant_id = %s
-                ORDER BY cc.name, con.value
-            """, (r_id,))
-            concept_rows = cursor.fetchall()
-            concepts = [{'category': cat, 'value': val} for cat, val in concept_rows]
-
-            restaurants.append({
-                'id': r_id,
-                'name': name,
-                'description': description,
-                'transcription': transcription,
-                'timestamp': timestamp.isoformat() if timestamp else None,
-                'server_id': server_id,
-                'curator': {'id': curator_id, 'name': curator_name} if curator_id else None,
-                'concepts': concepts
-            })
+        
+        if simple_mode:
+            # Simple mode: no concepts, faster response
+            for row in rows:
+                r_id, name, description, transcription, timestamp, server_id, curator_name, curator_id = row
+                restaurants.append({
+                    'id': r_id,
+                    'name': name,
+                    'description': description,
+                    'transcription': transcription,
+                    'timestamp': timestamp.isoformat() if timestamp else None,
+                    'server_id': server_id,
+                    'curator': {'id': curator_id, 'name': curator_name} if curator_id else None
+                })
+        else:
+            # Full mode: include concepts with optimized single query
+            restaurant_ids = [row[0] for row in rows]
+            
+            if restaurant_ids:
+                # Fetch all concepts for these restaurants in one query
+                placeholders = ','.join(['%s'] * len(restaurant_ids))
+                cursor.execute(f"""
+                    SELECT rc.restaurant_id, cc.name, con.value
+                    FROM restaurant_concepts rc
+                    JOIN concepts con ON rc.concept_id = con.id
+                    JOIN concept_categories cc ON con.category_id = cc.id
+                    WHERE rc.restaurant_id IN ({placeholders})
+                    ORDER BY rc.restaurant_id, cc.name, con.value
+                """, restaurant_ids)
+                concept_rows = cursor.fetchall()
+                
+                # Group concepts by restaurant_id
+                concepts_by_restaurant = defaultdict(list)
+                for r_id, cat, val in concept_rows:
+                    concepts_by_restaurant[r_id].append({'category': cat, 'value': val})
+            
+            # Build restaurant objects
+            for row in rows:
+                r_id, name, description, transcription, timestamp, server_id, curator_name, curator_id = row
+                restaurants.append({
+                    'id': r_id,
+                    'name': name,
+                    'description': description,
+                    'transcription': transcription,
+                    'timestamp': timestamp.isoformat() if timestamp else None,
+                    'server_id': server_id,
+                    'curator': {'id': curator_id, 'name': curator_name} if curator_id else None,
+                    'concepts': concepts_by_restaurant.get(r_id, [])
+                })
 
         app.logger.info(f"Successfully formatted {len(restaurants)} restaurants")
-        return jsonify(restaurants)
+        
+        # Prepare response with pagination metadata
+        response_data = {
+            'data': restaurants,
+            'pagination': {
+                'page': page,
+                'limit': limit,
+                'total': total_count,
+                'pages': (total_count + limit - 1) // limit
+            }
+        }
+        
+        # Return legacy format if requesting all data (no pagination params)
+        if page == 1 and limit >= total_count and not request.args.get('page'):
+            return jsonify(restaurants)
+        
+        return jsonify(response_data)
         
     except psycopg2.Error as e:
         app.logger.error(f"Database error fetching restaurants: {str(e)}")
