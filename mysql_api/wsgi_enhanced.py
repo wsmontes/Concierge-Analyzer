@@ -51,11 +51,17 @@ try:
 except Exception as e:
     logger.error(f"WSGI initialization failed: {e}")
     import traceback
-    logger.error(f"Traceback: {traceback.format_exc()}")
+    error_traceback = traceback.format_exc()
+    logger.error(f"Traceback: {error_traceback}")
+    
+    # Store error details for the error handler
+    initialization_error = str(e)
     
     # Create a minimal error app
     from flask import Flask, jsonify
+    from flask_cors import CORS
     application = Flask(__name__)
+    CORS(application, resources={r"/*": {"origins": "*"}})
     
     @application.route('/')
     @application.route('/<path:path>')
@@ -63,6 +69,6 @@ except Exception as e:
         return jsonify({
             'status': 'error',
             'error': 'Server initialization failed',
-            'details': str(e),
+            'details': initialization_error,
             'message': 'Check server logs for more information'
         }), 500

@@ -28,9 +28,9 @@ class DatabaseConfig:
         self.charset = 'utf8mb4'
         self.autocommit = False
         
-        # Connection pool settings
+        # Connection pool settings - reduced for PythonAnywhere
         self.pool_name = 'concierge_pool'
-        self.pool_size = 5
+        self.pool_size = 2  # Reduced from 5 to avoid pool exhaustion on PythonAnywhere
         self.pool_reset_session = True
         
     def get_connection_params(self) -> Dict[str, Any]:
