@@ -1,0 +1,16 @@
+[
+  {
+    "Name": "Bulk Restaurant 1",
+    "Type": "restaurant",
+    "Cuisine": ["French"],
+    "Price Range": "$$$$",
+    "metadata": []
+  },
+  {
+    "Name": "Bulk Restaurant 2",
+    "Type": "restaurant",
+    "Cuisine": ["Japanese"],
+    "Price Range": "$$$",
+    "metadata": []
+  }
+]

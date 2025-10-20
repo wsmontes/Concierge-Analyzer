@@ -1,0 +1,25 @@
+{
+  "Name": "Test Restaurant",
+  "Type": "restaurant",
+  "Cuisine": ["Italian", "Mediterranean"],
+  "Price Range": "$$$$",
+  "Location": {
+    "Address": "123 Test Street",
+    "City": "Madrid",
+    "Country": "Spain"
+  },
+  "metadata": [
+    {
+      "type": "michelin",
+      "stars": 2,
+      "year": 2024,
+      "category": "Michelin Stars"
+    },
+    {
+      "type": "50best",
+      "rank": 15,
+      "year": 2024,
+      "category": "World's 50 Best Restaurants"
+    }
+  ]
+}
