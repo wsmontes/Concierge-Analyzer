@@ -1,6 +1,8 @@
 # 
-# Requirements file for Concierge Entities API
-# Install with: pip install -r requirements.txt
+# PythonAnywhere-compatible Requirements for V3 API
+# Install with: pip3.13 install --user -r requirements_pythonanywhere.txt
+#
+# This version avoids packages that require compilation (Rust, C extensions)
 #
 
 # Core Flask framework
@@ -10,7 +12,7 @@ Werkzeug==2.3.7
 # CORS support for API
 Flask-CORS==4.0.0
 
-# MySQL database connector
+# MySQL database connector (pure Python, no compilation needed)
 mysql-connector-python==8.2.0
 
 # Environment variable management
@@ -23,11 +25,11 @@ jsonschema==4.19.2
 python-dateutil==2.8.2
 
 # V3 Dependencies - Pydantic for data validation
-pydantic==2.5.0
-pydantic[email]==2.5.0
+# CRITICAL: Python 3.13 requires newer pydantic with pre-built wheels
+# pydantic 2.5.0 doesn't have wheels for Python 3.13, causing Rust compilation
+# Using pydantic 2.9+ which has Python 3.13 wheels available
+pydantic>=2.9.0,<3.0.0
 
-# Development dependencies (optional)
-# pytest==7.4.3
-# pytest-cov==4.1.0
-# black==23.9.1
-# flake8==6.1.0
+# Note: pydantic[email] removed to avoid additional compilation issues
+# If email validation is needed later, can add email-validator separately
+# when disk quota allows or use simpler validation
