@@ -24,7 +24,19 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask application
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+# CORS Configuration - Enable for all routes with explicit settings
+CORS(app, 
+     resources={
+         r"/*": {
+             "origins": "*",
+             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+             "allow_headers": ["Content-Type", "Authorization"],
+             "expose_headers": ["Content-Type"],
+             "supports_credentials": False,
+             "max_age": 3600
+         }
+     })
 
 # Configuration
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
@@ -595,11 +607,32 @@ def method_not_allowed(error):
 def internal_error(error):
     """Handle 500 errors"""
     logger.error(f"Internal server error: {error}")
+    import traceback
+    logger.error(f"Traceback: {traceback.format_exc()}")
     return create_api_response(
         status="error",
-        error="Internal server error",
+        error="Internal server error. Check server logs for details.",
         status_code=500
     )
+
+@app.errorhandler(Exception)
+def handle_exception(error):
+    """Handle all uncaught exceptions"""
+    logger.error(f"Unhandled exception: {error}")
+    import traceback
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    return create_api_response(
+        status="error",
+        error=str(error),
+        status_code=500
+    )
+
+# Add OPTIONS method handler for CORS preflight
+@app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
+@app.route('/<path:path>', methods=['OPTIONS'])
+def handle_options(path):
+    """Handle OPTIONS requests for CORS preflight"""
+    return '', 204
 
 if __name__ == '__main__':
     # This will only run when the file is executed directly
