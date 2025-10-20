@@ -45,6 +45,13 @@ flask_session/
 .env.production
 .flaskenv
 
+# SSH Tunnel credentials (contains passwords)
+scripts/run_local_with_tunnel.py
+PASSWORDS_NEEDED.txt
+
+# Virtual environments
+mysql_api_venv/
+
 # IDEs and editors
 .idea/
 .vscode/
