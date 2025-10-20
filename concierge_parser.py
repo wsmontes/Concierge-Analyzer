@@ -1963,6 +1963,12 @@ def get_sheet_restaurants():
 
 @app.route('/api/restaurants/batch', methods=['POST'])
 def batch_insert_restaurants():
+    """
+    Batch insert restaurants endpoint.
+    Accepts array of restaurant objects and returns server IDs for each.
+    
+    Dependencies: restaurants, curators, concepts, restaurant_concepts tables
+    """
     try:
         data = request.get_json()
         if not isinstance(data, list):
@@ -1976,7 +1982,13 @@ def batch_insert_restaurants():
         )
         cursor = conn.cursor()
 
+        # Track results for each restaurant
+        results = []
+
         for r in data:
+            restaurant_name = r.get("name")
+            local_id = r.get("id")  # Client-side local ID
+            
             # Insert curator if doesn't exist
             curator_name = r.get("curator", {}).get("name", "Unknown")
             cursor.execute("""
@@ -1989,13 +2001,18 @@ def batch_insert_restaurants():
             cursor.execute("SELECT id FROM curators WHERE name = %s", (curator_name,))
             curator_id = cursor.fetchone()[0]
 
-            # Insert restaurant
+            # Insert restaurant and get server ID
             cursor.execute("""
                 INSERT INTO restaurants (name, description, transcription, timestamp, curator_id, server_id)
                 VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (name) DO NOTHING
+                ON CONFLICT (name) DO UPDATE SET
+                    description = EXCLUDED.description,
+                    transcription = EXCLUDED.transcription,
+                    timestamp = EXCLUDED.timestamp,
+                    curator_id = EXCLUDED.curator_id
+                RETURNING id
             """, (
-                r.get("name"),
+                restaurant_name,
                 r.get("description"),
                 r.get("transcription"),
                 r.get("timestamp"),
@@ -2003,50 +2020,70 @@ def batch_insert_restaurants():
                 r.get("server_id")  # Include server_id for sync tracking
             ))
 
-            # Get restaurant ID
-            cursor.execute("SELECT id FROM restaurants WHERE name = %s", (r.get("name"),))
-            restaurant_id = cursor.fetchone()[0]
+            # Get the server-assigned restaurant ID
+            result = cursor.fetchone()
+            server_id = result[0] if result else None
+            
+            if server_id:
+                # Process concepts
+                for c in r.get("concepts", []):
+                    category = c.get("category")
+                    value = c.get("value")
+                    if not category or not value:
+                        continue
+                    
+                    # Get category ID
+                    cursor.execute("SELECT id FROM concept_categories WHERE name = %s", (category,))
+                    result = cursor.fetchone()
+                    if result:
+                        category_id = result[0]
+                    else:
+                        continue  # skip unknown categories
 
-            # Process concepts
-            for c in r.get("concepts", []):
-                category = c.get("category")
-                value = c.get("value")
-                if not category or not value:
-                    continue
-                
-                # Get category ID
-                cursor.execute("SELECT id FROM concept_categories WHERE name = %s", (category,))
-                result = cursor.fetchone()
-                if result:
-                    category_id = result[0]
-                else:
-                    continue  # skip unknown categories
+                    # Insert concept if not exists
+                    cursor.execute("""
+                        INSERT INTO concepts (category_id, value)
+                        VALUES (%s, %s)
+                        ON CONFLICT (category_id, value) DO NOTHING
+                    """, (category_id, value))
 
-                # Insert concept if not exists
-                cursor.execute("""
-                    INSERT INTO concepts (category_id, value)
-                    VALUES (%s, %s)
-                    ON CONFLICT (category_id, value) DO NOTHING
-                """, (category_id, value))
+                    # Get concept ID
+                    cursor.execute("""
+                        SELECT id FROM concepts WHERE category_id = %s AND value = %s
+                    """, (category_id, value))
+                    concept_id = cursor.fetchone()[0]
 
-                # Get concept ID
-                cursor.execute("""
-                    SELECT id FROM concepts WHERE category_id = %s AND value = %s
-                """, (category_id, value))
-                concept_id = cursor.fetchone()[0]
+                    # Insert restaurant_concept
+                    cursor.execute("""
+                        INSERT INTO restaurant_concepts (restaurant_id, concept_id)
+                        VALUES (%s, %s)
+                        ON CONFLICT (restaurant_id, concept_id) DO NOTHING
+                    """, (server_id, concept_id))
 
-                # Insert restaurant_concept
-                cursor.execute("""
-                    INSERT INTO restaurant_concepts (restaurant_id, concept_id)
-                    VALUES (%s, %s)
-                    ON CONFLICT (restaurant_id, concept_id) DO NOTHING
-                """, (restaurant_id, concept_id))
+                # Add to results with local ID mapping
+                results.append({
+                    "localId": local_id,
+                    "serverId": server_id,
+                    "name": restaurant_name,
+                    "status": "success"
+                })
+            else:
+                results.append({
+                    "localId": local_id,
+                    "name": restaurant_name,
+                    "status": "error",
+                    "message": "Failed to get server ID"
+                })
 
         conn.commit()
         cursor.close()
         conn.close()
 
-        return jsonify({"status": "success"}), 200
+        return jsonify({
+            "status": "success",
+            "count": len(results),
+            "restaurants": results
+        }), 200
 
     except Exception as e:
         app.logger.error(f"Error in batch insert: {str(e)}")
